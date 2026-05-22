@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cross Product — Direction & Right-Hand Rule</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #f0f2f5; font-family: 'Segoe UI', sans-serif; display: flex; flex-direction: column; align-items: center; padding: 20px; }
+  h1 { font-size: 20px; color: #222; margin-bottom: 4px; }
+  .sub { font-size: 13px; color: #777; margin-bottom: 18px; text-align: center; }
+  .main { display: flex; gap: 16px; flex-wrap: wrap; justify-content: center; width: 100%; max-width: 900px; }
+  canvas { border-radius: 10px; background: #f8f8f8; box-shadow: 0 2px 10px rgba(0,0,0,0.10); display: block; }
+  .ctrl-row { display: flex; gap: 10px; margin-top: 8px; align-items: center; font-size: 12px; color: #666; }
+  .ctrl-row input { flex: 1; accent-color: #534AB7; }
+  .panel { display: flex; flex-direction: column; gap: 10px; width: 290px; }
+  .vcard { background: white; border-radius: 10px; padding: 12px; box-shadow: 0 1px 6px rgba(0,0,0,0.07); display: flex; flex-direction: column; gap: 8px; }
+  .vcard-title { font-size: 13px; font-weight: 600; }
+  .vrow { display: flex; align-items: center; gap: 8px; font-size: 12px; color: #555; }
+  .vrow span { min-width: 72px; }
+  .vrow input { flex: 1; }
+  .result-card { background: white; border-radius: 10px; padding: 12px; box-shadow: 0 1px 6px rgba(0,0,0,0.07); display: flex; flex-direction: column; gap: 8px; }
+  .badge { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 500; }
+  .rhr-card { background: #fff3ee; border-radius: 8px; padding: 10px 12px; font-size: 12px; color: #712B13; line-height: 1.8; }
+  .rhr-card b { color: #993C1D; }
+  .info-card { background: #f5f5f5; border-radius: 8px; padding: 10px 12px; font-size: 12px; color: #555; line-height: 1.7; }
+</style>
+</head>
+<body>
+<h1>Cross Product — Direction & Right-Hand Rule</h1>
+<p class="sub">a × b is perpendicular to both a and b · drag sliders to explore</p>
+
+<div class="main">
+
+  <div>
+    <canvas id="cpc" width="400" height="380"></canvas>
+    <div class="ctrl-row">
+      <span>Rotate</span>
+      <input type="range" min="-180" max="180" value="25" id="cpRot">
+      <span>Tilt</span>
+      <input type="range" min="5" max="75" value="30" id="cpTilt">
+    </div>
+  </div>
+
+  <div class="panel">
+
+    <div class="vcard">
+      <div class="vcard-title" style="color:#534AB7">Vector a</div>
+      <div class="vrow"><span>a₁ = <b id="va1">2</b></span><input type="range" min="-3" max="3" step="0.5" value="2" id="sa1" style="accent-color:#534AB7"></div>
+      <div class="vrow"><span>a₂ = <b id="va2">0</b></span><input type="range" min="-3" max="3" step="0.5" value="0" id="sa2" style="accent-color:#534AB7"></div>
+      <div class="vrow"><span>a₃ = <b id="va3">0</b></span><input type="range" min="-3" max="3" step="0.5" value="0" id="sa3" style="accent-color:#534AB7"></div>
+    </div>
+
+    <div class="vcard">
+      <div class="vcard-title" style="color:#1D9E75">Vector b</div>
+      <div class="vrow"><span>b₁ = <b id="vb1">0</b></span><input type="range" min="-3" max="3" step="0.5" value="0" id="sb1" style="accent-color:#1D9E75"></div>
+      <div class="vrow"><span>b₂ = <b id="vb2">2</b></span><input type="range" min="-3" max="3" step="0.5" value="2" id="sb2" style="accent-color:#1D9E75"></div>
+      <div class="vrow"><span>b₃ = <b id="vb3">0</b></span><input type="range" min="-3" max="3" step="0.5" value="0" id="sb3" style="accent-color:#1D9E75"></div>
+    </div>
+
+    <div class="result-card">
+      <div class="vcard-title" style="color:#D85A30">a × b result</div>
+      <div style="font-size:15px;font-weight:600;color:#D85A30" id="crossResult">(0, 0, 4)</div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="font-size:12px;color:#888">|a × b| =</span>
+        <span style="font-size:20px;font-weight:600;color:#D85A30" id="crossMag">4.00</span>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px">
+        <span style="font-size:12px;color:#888">direction:</span>
+        <span class="badge" id="dirBadge" style="background:#FFF3EE;color:#993C1D">↑ positive z</span>
+      </div>
+    </div>
+
+    <div class="rhr-card">
+      <div style="font-weight:600;margin-bottom:4px">Right-hand rule:</div>
+      <div>① Point fingers along <b style="color:#534AB7">a</b></div>
+      <div>② Curl toward <b style="color:#1D9E75">b</b></div>
+      <div>③ Thumb points along <b style="color:#D85A30">a × b</b></div>
+      <div style="margin-top:6px;padding-top:6px;border-top:1px solid rgba(200,100,50,0.2)">
+        <b>a × b = −b × a</b> (anti-commutative)
+      </div>
+    </div>
+
+    <div class="info-card">
+      <div id="perpCheck">a×b ⊥ a: ✓ &nbsp;&nbsp; a×b ⊥ b: ✓</div>
+      <div id="zeroCheck" style="margin-top:4px">area of parallelogram = 4.00</div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+const cv  = document.getElementById('cpc');
+const ctx = cv.getContext('2d');
+const W = cv.width, H = cv.height;
+const CX = W/2, CY = H/2 + 10, SC = 58;
+let rotDeg = 25, tiltDeg = 30;
+let a = [2,0,0], b = [0,2,0];
+
+function wire(id, arr, idx, lbl) {
+  document.getElementById(id).oninput = e => {
+    arr[idx] = +e.target.value;
+    document.getElementById(lbl).textContent = arr[idx];
+    update();
+  };
+}
+wire('sa1',a,0,'va1'); wire('sa2',a,1,'va2'); wire('sa3',a,2,'va3');
+wire('sb1',b,0,'vb1'); wire('sb2',b,1,'vb2'); wire('sb3',b,2,'vb3');
+document.getElementById('cpRot').oninput  = e => { rotDeg  = +e.target.value; update(); };
+document.getElementById('cpTilt').oninput = e => { tiltDeg = +e.target.value; update(); };
+
+function proj(x, y, z) {
+  const r = rotDeg * Math.PI/180, t = tiltDeg * Math.PI/180;
+  const px = x*Math.cos(r) - y*Math.sin(r);
+  const py = x*Math.sin(r) + y*Math.cos(r);
+  return [CX + px*SC, CY + (-z*Math.cos(t) + py*Math.sin(t))*SC];
+}
+
+function arrow3(v, color, lw=2.5) {
+  const [x1,y1] = proj(0,0,0), [x2,y2] = proj(v[0],v[1],v[2]);
+  const dx=x2-x1, dy=y2-y1, len=Math.sqrt(dx*dx+dy*dy);
+  if (len < 2) return;
+  const ux=dx/len, uy=dy/len, s=11;
+  ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2);
+  ctx.strokeStyle=color; ctx.lineWidth=lw; ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(x2,y2);
+  ctx.lineTo(x2-ux*s+uy*s*0.4, y2-uy*s-ux*s*0.4);
+  ctx.lineTo(x2-ux*s-uy*s*0.4, y2-uy*s+ux*s*0.4);
+  ctx.closePath(); ctx.fillStyle=color; ctx.fill();
+}
+
+function cross3(u,v) { return [u[1]*v[2]-u[2]*v[1], u[2]*v[0]-u[0]*v[2], u[0]*v[1]-u[1]*v[0]]; }
+function dot3(u,v)   { return u[0]*v[0]+u[1]*v[1]+u[2]*v[2]; }
+function mag3(v)     { return Math.sqrt(v[0]*v[0]+v[1]*v[1]+v[2]*v[2]); }
+function norm3(v)    { const m=mag3(v); return m<0.001?[0,0,0]:[v[0]/m,v[1]/m,v[2]/m]; }
+
+function update() {
+  ctx.clearRect(0, 0, W, H);
+  const axb = cross3(a, b);
+  const magAxb = mag3(axb);
+  const scaledAxb = magAxb > 0.01
+    ? norm3(axb).map(x => x * Math.min(magAxb, 3))
+    : [0,0,0];
+
+  // axes
+  ctx.strokeStyle='rgba(128,128,128,0.2)'; ctx.lineWidth=0.8;
+  [[3.5,0,0],[0,3.5,0],[0,0,3.5]].forEach(v=>{
+    const[x1,y1]=proj(0,0,0),[x2,y2]=proj(...v);
+    ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+  });
+  ctx.fillStyle='rgba(120,120,120,0.5)'; ctx.font='12px sans-serif';
+  const[ax2,ay2]=proj(3.7,0,0); ctx.fillText('x',ax2,ay2+4);
+  const[bx2,by2]=proj(0,3.7,0); ctx.fillText('y',bx2+2,by2+4);
+  const[cz2,cz3]=proj(0,0,3.7); ctx.fillText('z',cz2+2,cz3);
+
+  // parallelogram base
+  const ab=[a[0]+b[0],a[1]+b[1],a[2]+b[2]];
+  const[p0x,p0y]=proj(0,0,0);
+  const[p1x,p1y]=proj(...a);
+  const[p2x,p2y]=proj(...ab);
+  const[p3x,p3y]=proj(...b);
+  ctx.beginPath();
+  ctx.moveTo(p0x,p0y); ctx.lineTo(p1x,p1y);
+  ctx.lineTo(p2x,p2y); ctx.lineTo(p3x,p3y);
+  ctx.closePath();
+  ctx.fillStyle='rgba(83,74,183,0.10)'; ctx.fill();
+  ctx.strokeStyle='rgba(83,74,183,0.3)'; ctx.lineWidth=1;
+  ctx.setLineDash([4,3]); ctx.stroke(); ctx.setLineDash([]);
+
+  // dashed lines from a×b tip to a and b tips
+  if (magAxb > 0.1) {
+    const[ex,ey]=proj(...scaledAxb);
+    const[ax3,ay3]=proj(...a);
+    const[bx3,by3]=proj(...b);
+    ctx.beginPath(); ctx.moveTo(ex,ey); ctx.lineTo(ax3,ay3);
+    ctx.strokeStyle='rgba(216,90,48,0.3)'; ctx.lineWidth=1;
+    ctx.setLineDash([3,4]); ctx.stroke(); ctx.setLineDash([]);
+    ctx.beginPath(); ctx.moveTo(ex,ey); ctx.lineTo(bx3,by3);
+    ctx.strokeStyle='rgba(216,90,48,0.3)'; ctx.lineWidth=1;
+    ctx.setLineDash([3,4]); ctx.stroke(); ctx.setLineDash([]);
+  }
+
+  // right-angle mark between a and a×b
+  if (magAxb > 0.1 && mag3(a) > 0.1) {
+    const na=norm3(a), nc=norm3(axb), s=0.22;
+    const pa=proj(na[0]*s,na[1]*s,na[2]*s);
+    const pc=proj(nc[0]*s,nc[1]*s,nc[2]*s);
+    const corner=[na[0]*s+nc[0]*s,na[1]*s+nc[1]*s,na[2]*s+nc[2]*s];
+    const[px2,py2]=proj(...corner);
+    ctx.beginPath(); ctx.moveTo(pa[0],pa[1]); ctx.lineTo(px2,py2); ctx.lineTo(pc[0],pc[1]);
+    ctx.strokeStyle='rgba(216,90,48,0.7)'; ctx.lineWidth=1.2; ctx.stroke();
+  }
+
+  // vectors
+  arrow3(a, '#534AB7');
+  arrow3(b, '#1D9E75');
+  if (magAxb > 0.1) arrow3(scaledAxb, '#D85A30', 3);
+
+  // labels
+  ctx.font='bold 15px sans-serif';
+  const[lax,lay]=proj(a[0]*1.12+0.1,a[1]*1.12,a[2]*1.12);
+  ctx.fillStyle='#3C3489'; ctx.fillText('a',lax,lay);
+  const[lbx,lby]=proj(b[0]*1.12,b[1]*1.12+0.1,b[2]*1.12);
+  ctx.fillStyle='#085041'; ctx.fillText('b',lbx,lby);
+  if (magAxb > 0.1) {
+    const sn=norm3(axb);
+    const[lcx,lcy]=proj(scaledAxb[0]+sn[0]*0.35,scaledAxb[1]+sn[1]*0.35,scaledAxb[2]+sn[2]*0.35);
+    ctx.fillStyle='#993C1D'; ctx.font='bold 14px sans-serif';
+    ctx.fillText('a×b',lcx-10,lcy);
+  }
+
+  // update UI
+  document.getElementById('crossResult').textContent =
+    `(${axb[0].toFixed(2)}, ${axb[1].toFixed(2)}, ${axb[2].toFixed(2)})`;
+  document.getElementById('crossMag').textContent = magAxb.toFixed(2);
+
+  const badge = document.getElementById('dirBadge');
+  if (magAxb < 0.01) {
+    badge.textContent='zero vector (a ∥ b)';
+    badge.style.background='#eee'; badge.style.color='#888';
+  } else if (axb[2] > 0.01) {
+    badge.textContent='↑ positive z direction';
+    badge.style.background='#FFF3EE'; badge.style.color='#993C1D';
+  } else if (axb[2] < -0.01) {
+    badge.textContent='↓ negative z direction';
+    badge.style.background='#EEF3FF'; badge.style.color='#3C3489';
+  } else {
+    badge.textContent='lies in the xy-plane';
+    badge.style.background='#F0FAF5'; badge.style.color='#085041';
+  }
+
+  const perpA = Math.abs(dot3(axb,a));
+  const perpB = Math.abs(dot3(axb,b));
+  const magA = mag3(a), magB = mag3(b);
+  document.getElementById('perpCheck').textContent =
+    `a×b ⊥ a: ${perpA < 0.01*magA*magAxb+0.001 ? '✓' : '✗'}` +
+    `   a×b ⊥ b: ${perpB < 0.01*magB*magAxb+0.001 ? '✓' : '✗'}`;
+  document.getElementById('zeroCheck').textContent =
+    magAxb < 0.01
+      ? 'a ∥ b → cross product = zero vector'
+      : `area of parallelogram = ${magAxb.toFixed(2)}`;
+}
+
+update();
+</script>
+</body>
+</html>
