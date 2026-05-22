@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Polar Curve Explorer</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #f0f2f5; font-family: 'Segoe UI', sans-serif; display: flex; flex-direction: column; align-items: center; padding: 16px; min-height: 100vh; }
+  h2 { color: #222; margin-bottom: 4px; font-size: 20px; }
+  .subtitle { color: #666; font-size: 13px; margin-bottom: 14px; }
+
+  .main { display: flex; gap: 16px; width: 100%; max-width: 960px; align-items: flex-start; flex-wrap: wrap; justify-content: center; }
+
+  canvas { border-radius: 10px; background: white; box-shadow: 0 2px 12px rgba(0,0,0,0.13); flex-shrink: 0; }
+
+  .panel { background: white; border-radius: 10px; box-shadow: 0 2px 12px rgba(0,0,0,0.1); padding: 18px; width: 280px; display: flex; flex-direction: column; gap: 14px; }
+
+  .panel h3 { font-size: 14px; color: #444; border-bottom: 1px solid #eee; padding-bottom: 8px; }
+
+  .row { display: flex; flex-direction: column; gap: 4px; }
+  .row label { font-size: 12px; color: #555; display: flex; justify-content: space-between; }
+  .row label span { font-weight: 600; color: #534AB7; }
+  input[type=range] { width: 100%; accent-color: #534AB7; }
+
+  .toggle-row { display: flex; gap: 0; border: 1.5px solid #534AB7; border-radius: 6px; overflow: hidden; }
+  .toggle-row button { flex: 1; border: none; background: white; color: #534AB7; font-size: 13px; font-weight: 600; padding: 7px 0; cursor: pointer; transition: all 0.15s; }
+  .toggle-row button.active { background: #534AB7; color: white; }
+
+  .preset-row { display: flex; flex-wrap: wrap; gap: 6px; }
+  .preset-btn { border: 1.5px solid #ddd; background: white; border-radius: 6px; font-size: 11px; padding: 5px 8px; cursor: pointer; color: #444; transition: all 0.15s; }
+  .preset-btn:hover { border-color: #534AB7; color: #534AB7; }
+
+  .formula-box { background: #f5f4ff; border: 1.5px solid #c5c0f0; border-radius: 8px; padding: 10px 14px; text-align: center; font-size: 15px; color: #3a2f9e; font-weight: 600; letter-spacing: 0.3px; }
+
+  .info-box { background: #f0faf5; border: 1.5px solid #9fe1cb; border-radius: 8px; padding: 8px 12px; font-size: 12px; color: #0a5a3a; line-height: 1.6; }
+
+  .sweep-row { display: flex; flex-direction: column; gap: 4px; }
+  .sweep-bar { height: 6px; background: #eee; border-radius: 3px; overflow: hidden; }
+  .sweep-fill { height: 100%; background: #534AB7; border-radius: 3px; transition: width 0.05s; }
+</style>
+</head>
+<body>
+<h2>Polar Curve Explorer</h2>
+<p class="subtitle">Limaçons, cardioids, rose curves, and more</p>
+
+<div class="main">
+  <canvas id="cv" width="520" height="520"></canvas>
+
+  <div class="panel">
+
+    <div>
+      <h3>Curve type</h3>
+    </div>
+
+    <!-- trig function toggle -->
+    <div class="row">
+      <label>Trig function</label>
+      <div class="toggle-row">
+        <button id="btn-cos" class="active" onclick="setTrig('cos')">cos θ</button>
+        <button id="btn-sin" onclick="setTrig('sin')">sin θ</button>
+      </div>
+    </div>
+
+    <!-- curve family toggle -->
+    <div class="row">
+      <label>Family</label>
+      <div class="toggle-row" style="flex-wrap:wrap">
+        <button id="btn-limacon" class="active" onclick="setFamily('limacon')" style="flex:1 1 40%">r = a ± b·trig</button>
+        <button id="btn-rose"    onclick="setFamily('rose')"    style="flex:1 1 40%">r = a·cos(nθ)</button>
+      </div>
+    </div>
+
+    <!-- formula display -->
+    <div class="formula-box" id="formula">r = a + b·cosθ</div>
+
+    <!-- Parameter a -->
+    <div class="row">
+      <label>a &nbsp;<span id="aVal">1.0</span></label>
+      <input type="range" id="slA" min="-3" max="3" step="0.1" value="1">
+    </div>
+
+    <!-- Parameter b (limacon only) -->
+    <div class="row" id="rowB">
+      <label>b &nbsp;<span id="bVal">1.0</span></label>
+      <input type="range" id="slB" min="-3" max="3" step="0.1" value="1">
+    </div>
+
+    <!-- Parameter n (rose only, hidden initially) -->
+    <div class="row" id="rowN" style="display:none">
+      <label>n (petals) &nbsp;<span id="nVal">3</span></label>
+      <input type="range" id="slN" min="1" max="8" step="1" value="3">
+    </div>
+
+    <!-- θ sweep -->
+    <div class="sweep-row">
+      <div class="row">
+        <label>θ sweep &nbsp;<span id="sweepVal">360°</span></label>
+        <input type="range" id="slSweep" min="1" max="720" step="1" value="360">
+      </div>
+      <div class="sweep-bar"><div class="sweep-fill" id="sweepFill" style="width:50%"></div></div>
+    </div>
+
+    <!-- Presets -->
+    <div>
+      <h3 style="margin-bottom:8px">Presets</h3>
+      <div class="preset-row">
+        <button class="preset-btn" onclick="applyPreset(1,1,'cos','limacon')">Cardioid<br><small>a=b=1</small></button>
+        <button class="preset-btn" onclick="applyPreset(2,1,'cos','limacon')">Limaçon<br><small>a=2,b=1</small></button>
+        <button class="preset-btn" onclick="applyPreset(1,2,'cos','limacon')">Inner loop<br><small>a=1,b=2</small></button>
+        <button class="preset-btn" onclick="applyPreset(1,0,'cos','limacon')">Circle<br><small>a=1,b=0</small></button>
+        <button class="preset-btn" onclick="applyPreset(1,3,'cos','rose')">3-petal rose<br><small>n=3</small></button>
+        <button class="preset-btn" onclick="applyPreset(1,4,'cos','rose')">4-petal rose<br><small>n=4</small></button>
+        <button class="preset-btn" onclick="applyPreset(1,1,'sin','limacon')">Cardioid<br><small>sin ver.</small></button>
+        <button class="preset-btn" onclick="applyPreset(0,1,'cos','limacon')">Circle r=cosθ<br><small>a=0,b=1</small></button>
+      </div>
+    </div>
+
+    <!-- Info -->
+    <div class="info-box" id="infoBox">
+      When a = b: <b>cardioid</b> (cusp at origin).<br>
+      When a &gt; b: <b>convex limaçon</b> (no inner loop).<br>
+      When a &lt; b: <b>limaçon with inner loop</b>.
+    </div>
+
+  </div>
+</div>
+
+<script>
+const cv  = document.getElementById('cv');
+const ctx = cv.getContext('2d');
+const W = cv.width, H = cv.height;
+const CX = W/2, CY = H/2;
+
+let trigFn   = 'cos';   // 'cos' | 'sin'
+let family   = 'limacon'; // 'limacon' | 'rose'
+let a = 1, b = 1, n = 3, sweepDeg = 360;
+
+// slider wiring
+document.getElementById('slA').oninput = e => { a = +e.target.value; document.getElementById('aVal').textContent = a.toFixed(1); updateInfo(); draw(); };
+document.getElementById('slB').oninput = e => { b = +e.target.value; document.getElementById('bVal').textContent = b.toFixed(1); updateInfo(); draw(); };
+document.getElementById('slN').oninput = e => { n = +e.target.value; document.getElementById('nVal').textContent = n; updateInfo(); draw(); };
+document.getElementById('slSweep').oninput = e => {
+  sweepDeg = +e.target.value;
+  document.getElementById('sweepVal').textContent = sweepDeg + '°';
+  document.getElementById('sweepFill').style.width = (sweepDeg/720*100)+'%';
+  draw();
+};
+
+function setTrig(t) {
+  trigFn = t;
+  document.getElementById('btn-cos').classList.toggle('active', t==='cos');
+  document.getElementById('btn-sin').classList.toggle('active', t==='sin');
+  updateFormula(); draw();
+}
+
+function setFamily(f) {
+  family = f;
+  document.getElementById('btn-limacon').classList.toggle('active', f==='limacon');
+  document.getElementById('btn-rose').classList.toggle('active', f==='rose');
+  document.getElementById('rowB').style.display = f==='limacon' ? '' : 'none';
+  document.getElementById('rowN').style.display = f==='rose'    ? '' : 'none';
+  updateFormula(); updateInfo(); draw();
+}
+
+function updateFormula() {
+  const t = trigFn === 'cos' ? 'cosθ' : 'sinθ';
+  let f;
+  if (family === 'limacon') {
+    const sign = b >= 0 ? '+' : '−';
+    f = `r = ${a.toFixed(1)} ${sign} ${Math.abs(b).toFixed(1)}·${t}`;
+  } else {
+    f = `r = ${a.toFixed(1)}·cos(${n}θ)`;
+  }
+  document.getElementById('formula').textContent = f;
+}
+
+function updateInfo() {
+  const box = document.getElementById('infoBox');
+  if (family === 'rose') {
+    const petals = n % 2 === 0 ? 2*n : n;
+    box.innerHTML = `Rose curve with <b>n = ${n}</b>.<br>Petals: <b>${petals}</b> (even n → 2n petals, odd n → n petals).`;
+  } else {
+    const aa = Math.abs(a), ab = Math.abs(b);
+    if (ab < 0.05) box.innerHTML = `<b>Circle</b>: r = ${a.toFixed(1)} (constant radius).`;
+    else if (Math.abs(aa - ab) < 0.12) box.innerHTML = `<b>Cardioid</b>: a ≈ b. Cusp at the origin.`;
+    else if (aa > ab) box.innerHTML = `<b>Convex limaçon</b>: |a| > |b|, no inner loop.`;
+    else box.innerHTML = `<b>Limaçon with inner loop</b>: |a| < |b|.`;
+  }
+}
+
+function getR(theta) {
+  const trig = trigFn === 'cos' ? Math.cos(theta) : Math.sin(theta);
+  if (family === 'limacon') return a + b * trig;
+  else return a * Math.cos(n * theta);
+}
+
+// auto-scale: find max |r| to fit canvas
+function getScale() {
+  let maxR = 0;
+  for (let i = 0; i <= 1440; i++) {
+    const theta = 2 * Math.PI * i / 1440;
+    maxR = Math.max(maxR, Math.abs(getR(theta)));
+  }
+  if (maxR < 0.01) maxR = 1;
+  return Math.min((W/2 - 40) / maxR, 120);
+}
+
+function draw() {
+  updateFormula();
+  ctx.clearRect(0, 0, W, H);
+
+  const sc = getScale();
+
+  // --- Polar grid ---
+  const maxR = (W/2 - 30) / sc;
+  const step = maxR <= 2 ? 0.5 : maxR <= 4 ? 1 : 2;
+  ctx.strokeStyle = 'rgba(0,0,0,0.07)'; ctx.lineWidth = 0.8;
+  for (let r = step; r <= maxR + step; r += step) {
+    ctx.beginPath();
+    ctx.arc(CX, CY, r * sc, 0, 2*Math.PI);
+    ctx.stroke();
+    ctx.fillStyle = 'rgba(0,0,0,0.22)'; ctx.font = '10px sans-serif';
+    ctx.fillText(r % 1 === 0 ? r : r.toFixed(1), CX + r*sc + 3, CY + 12);
+  }
+  for (let a2 = 0; a2 < 360; a2 += 30) {
+    const rad = a2 * Math.PI/180;
+    ctx.beginPath();
+    ctx.moveTo(CX, CY);
+    ctx.lineTo(CX + Math.cos(rad)*(W/2-10), CY - Math.sin(rad)*(H/2-10));
+    ctx.stroke();
+  }
+
+  // --- Axes ---
+  ctx.strokeStyle = 'rgba(0,0,0,0.4)'; ctx.lineWidth = 1.5;
+  ctx.beginPath(); ctx.moveTo(30, CY); ctx.lineTo(W-20, CY); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(CX, H-20); ctx.lineTo(CX, 20); ctx.stroke();
+  ctx.fillStyle = '#444'; ctx.font = 'bold 13px sans-serif';
+  ctx.fillText('x', W-16, CY+5);
+  ctx.fillText('y', CX+6, 18);
+
+  // --- Curve fill ---
+  const sweepRad = sweepDeg * Math.PI / 180;
+  const STEPS = Math.max(8, sweepDeg * 4);
+
+  ctx.beginPath();
+  ctx.moveTo(CX, CY);
+  for (let i = 0; i <= STEPS; i++) {
+    const theta = sweepRad * i / STEPS;
+    const r = getR(theta);
+    ctx.lineTo(CX + r * Math.cos(theta) * sc, CY - r * Math.sin(theta) * sc);
+  }
+  ctx.closePath();
+  ctx.fillStyle = 'rgba(127,119,221,0.20)'; ctx.fill();
+
+  // --- Curve outline ---
+  ctx.beginPath();
+  for (let i = 0; i <= STEPS; i++) {
+    const theta = sweepRad * i / STEPS;
+    const r = getR(theta);
+    const px = CX + r * Math.cos(theta) * sc;
+    const py = CY - r * Math.sin(theta) * sc;
+    i === 0 ? ctx.moveTo(px, py) : ctx.lineTo(px, py);
+  }
+  ctx.strokeStyle = '#534AB7'; ctx.lineWidth = 2.5; ctx.stroke();
+
+  // --- Sweep tip indicator ---
+  if (sweepDeg < 719) {
+    const theta = sweepRad;
+    const r = getR(theta);
+    const ex = CX + r * Math.cos(theta) * sc;
+    const ey = CY - r * Math.sin(theta) * sc;
+    ctx.beginPath(); ctx.moveTo(CX, CY); ctx.lineTo(ex, ey);
+    ctx.strokeStyle = 'rgba(200,100,0,0.75)'; ctx.lineWidth = 1.8;
+    ctx.setLineDash([5,3]); ctx.stroke(); ctx.setLineDash([]);
+    ctx.beginPath(); ctx.arc(ex, ey, 4.5, 0, 2*Math.PI);
+    ctx.fillStyle = 'rgba(200,100,0,0.9)'; ctx.fill();
+    ctx.fillStyle = 'rgba(170,70,0,0.95)'; ctx.font = 'bold 11px sans-serif';
+    ctx.fillText('θ=' + sweepDeg + '°', ex+7, ey-7);
+  }
+
+  // --- Origin dot ---
+  ctx.beginPath(); ctx.arc(CX, CY, 4, 0, 2*Math.PI);
+  ctx.fillStyle = '#888'; ctx.fill();
+
+  // --- Formula overlay on canvas ---
+  const ftext = document.getElementById('formula').textContent;
+  ctx.fillStyle = 'rgba(83,74,183,0.95)'; ctx.font = 'bold 15px sans-serif';
+  ctx.fillText(ftext, 14, 24);
+}
+
+function applyPreset(av, bv, trig, fam) {
+  a = av; b = bv; trigFn = trig; family = fam;
+  if (fam === 'rose') n = bv;
+
+  document.getElementById('slA').value = a;
+  document.getElementById('slB').value = b;
+  document.getElementById('slN').value = n;
+  document.getElementById('aVal').textContent = a.toFixed(1);
+  document.getElementById('bVal').textContent = b.toFixed(1);
+  document.getElementById('nVal').textContent = n;
+
+  document.getElementById('btn-cos').classList.toggle('active', trig==='cos');
+  document.getElementById('btn-sin').classList.toggle('active', trig==='sin');
+  document.getElementById('btn-limacon').classList.toggle('active', fam==='limacon');
+  document.getElementById('btn-rose').classList.toggle('active', fam==='rose');
+  document.getElementById('rowB').style.display = fam==='limacon' ? '' : 'none';
+  document.getElementById('rowN').style.display = fam==='rose'    ? '' : 'none';
+
+  sweepDeg = 360;
+  document.getElementById('slSweep').value = 360;
+  document.getElementById('sweepVal').textContent = '360°';
+  document.getElementById('sweepFill').style.width = '50%';
+
+  updateInfo(); draw();
+}
+
+// init
+updateInfo(); draw();
+</script>
+</body>
+</html>
