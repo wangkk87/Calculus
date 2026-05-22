@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Scalar Triple Product — Volume Explorer</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: #f0f2f5; font-family: 'Segoe UI', sans-serif; display: flex; flex-direction: column; align-items: center; padding: 20px; }
+  h1 { font-size: 20px; color: #222; margin-bottom: 4px; }
+  .sub { font-size: 13px; color: #777; margin-bottom: 18px; text-align: center; }
+  .main { display: flex; gap: 16px; flex-wrap: wrap; justify-content: center; width: 100%; max-width: 900px; }
+  canvas { border-radius: 10px; background: #f8f8f8; box-shadow: 0 2px 10px rgba(0,0,0,0.10); display: block; }
+  .ctrl-row { display: flex; gap: 10px; margin-top: 8px; align-items: center; font-size: 12px; color: #666; }
+  .ctrl-row input { flex: 1; accent-color: #534AB7; }
+  .panel { display: flex; flex-direction: column; gap: 10px; width: 290px; }
+  .vcard { background: white; border-radius: 10px; padding: 12px; box-shadow: 0 1px 6px rgba(0,0,0,0.07); display: flex; flex-direction: column; gap: 8px; }
+  .vcard-title { font-size: 13px; font-weight: 600; }
+  .vrow { display: flex; align-items: center; gap: 8px; font-size: 12px; color: #555; }
+  .vrow span { min-width: 72px; }
+  .vrow input { flex: 1; }
+  .grid2 { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  .metric { background: #f5f5f5; border-radius: 8px; padding: 10px; text-align: center; }
+  .metric .lbl { font-size: 11px; color: #888; margin-bottom: 4px; }
+  .metric .val { font-size: 18px; font-weight: 600; color: #534AB7; }
+  .metric.big { grid-column: span 2; background: #fff3ee; }
+  .metric.big .val { font-size: 26px; color: #D85A30; }
+  .info { background: #fff3ee; border-radius: 8px; padding: 10px 12px; font-size: 12px; color: #712B13; line-height: 1.75; }
+  .info b { color: #993C1D; }
+</style>
+</head>
+<body>
+<h1>Scalar Triple Product — Volume of a Parallelepiped</h1>
+<p class="sub">V = |a · (b × c)| = |det[a, b, c]| &nbsp;·&nbsp; Drag sliders to reshape the box</p>
+
+<div class="main">
+
+  <div>
+    <canvas id="vc3" width="400" height="380"></canvas>
+    <div class="ctrl-row">
+      <span>Rotate</span>
+      <input type="range" min="-180" max="180" value="30" id="slRot">
+      <span>Tilt</span>
+      <input type="range" min="5" max="70" value="28" id="slTilt">
+    </div>
+  </div>
+
+  <div class="panel">
+
+    <div class="vcard">
+      <div class="vcard-title" style="color:#534AB7">Vector a</div>
+      <div class="vrow"><span>a₁ = <b id="a1v">2</b></span><input type="range" min="-3" max="3" step="0.5" value="2" id="sla1" style="accent-color:#534AB7"></div>
+      <div class="vrow"><span>a₂ = <b id="a2v">0</b></span><input type="range" min="-3" max="3" step="0.5" value="0" id="sla2" style="accent-color:#534AB7"></div>
+      <div class="vrow"><span>a₃ = <b id="a3v">0</b></span><input type="range" min="-3" max="3" step="0.5" value="0" id="sla3" style="accent-color:#534AB7"></div>
+    </div>
+
+    <div class="vcard">
+      <div class="vcard-title" style="color:#1D9E75">Vector b</div>
+      <div class="vrow"><span>b₁ = <b id="b1v">0</b></span><input type="range" min="-3" max="3" step="0.5" value="0" id="slb1" style="accent-color:#1D9E75"></div>
+      <div class="vrow"><span>b₂ = <b id="b2v">2</b></span><input type="range" min="-3" max="3" step="0.5" value="2" id="slb2" style="accent-color:#1D9E75"></div>
+      <div class="vrow"><span>b₃ = <b id="b3v">0</b></span><input type="range" min="-3" max="3" step="0.5" value="0" id="slb3" style="accent-color:#1D9E75"></div>
+    </div>
+
+    <div class="vcard">
+      <div class="vcard-title" style="color:#D85A30">Vector c</div>
+      <div class="vrow"><span>c₁ = <b id="c1v">0</b></span><input type="range" min="-3" max="3" step="0.5" value="0" id="slc1" style="accent-color:#D85A30"></div>
+      <div class="vrow"><span>c₂ = <b id="c2v">0</b></span><input type="range" min="-3" max="3" step="0.5" value="0" id="slc2" style="accent-color:#D85A30"></div>
+      <div class="vrow"><span>c₃ = <b id="c3v">2</b></span><input type="range" min="-3" max="3" step="0.5" value="2" id="slc3" style="accent-color:#D85A30"></div>
+    </div>
+
+    <div class="grid2">
+      <div class="metric">
+        <div class="lbl">b × c</div>
+        <div class="val" style="font-size:12px;color:#534AB7" id="crossBC">(0, 0, 4)</div>
+      </div>
+      <div class="metric">
+        <div class="lbl">a · (b × c)</div>
+        <div class="val" id="tripleVal">8.00</div>
+      </div>
+      <div class="metric big">
+        <div class="lbl">Volume = |a · (b × c)|</div>
+        <div class="val" id="volVal">8.00</div>
+      </div>
+    </div>
+
+    <div class="info">
+      <div><b>V = |a · (b × c)|</b> = |det[a, b, c]|</div>
+      <div>b × c gives the normal to the base face.</div>
+      <div>a · (b × c) = height × base area.</div>
+      <div id="interpBox2" style="margin-top:6px;font-style:italic;color:#993C1D">Box volume = 8.00</div>
+    </div>
+
+  </div>
+</div>
+
+<script>
+const cv  = document.getElementById('vc3');
+const ctx = cv.getContext('2d');
+const W = cv.width, H = cv.height;
+let rotDeg = 30, tiltDeg = 28;
+let a = [2,0,0], b = [0,2,0], c = [0,0,2];
+
+function wire(id, arr, idx, labelId) {
+  document.getElementById(id).oninput = e => {
+    arr[idx] = +e.target.value;
+    document.getElementById(labelId).textContent = arr[idx];
+    update();
+  };
+}
+wire('sla1',a,0,'a1v'); wire('sla2',a,1,'a2v'); wire('sla3',a,2,'a3v');
+wire('slb1',b,0,'b1v'); wire('slb2',b,1,'b2v'); wire('slb3',b,2,'b3v');
+wire('slc1',c,0,'c1v'); wire('slc2',c,1,'c2v'); wire('slc3',c,2,'c3v');
+document.getElementById('slRot').oninput  = e => { rotDeg  = +e.target.value; update(); };
+document.getElementById('slTilt').oninput = e => { tiltDeg = +e.target.value; update(); };
+
+const SC = 56, CX = W/2, CY = H/2 + 10;
+
+function proj(x, y, z) {
+  const r = rotDeg * Math.PI/180, t = tiltDeg * Math.PI/180;
+  const px = x*Math.cos(r) - y*Math.sin(r);
+  const py = x*Math.sin(r) + y*Math.cos(r);
+  return [CX + px*SC, CY + (-z*Math.cos(t) + py*Math.sin(t))*SC];
+}
+
+function arrow3(v, color, lw=2.5) {
+  const [x1,y1] = proj(0,0,0), [x2,y2] = proj(v[0],v[1],v[2]);
+  const dx=x2-x1, dy=y2-y1, len=Math.sqrt(dx*dx+dy*dy);
+  if (len < 2) return;
+  const ux=dx/len, uy=dy/len, s=11;
+  ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2);
+  ctx.strokeStyle=color; ctx.lineWidth=lw; ctx.stroke();
+  ctx.beginPath();
+  ctx.moveTo(x2,y2);
+  ctx.lineTo(x2-ux*s+uy*s*0.4, y2-uy*s-ux*s*0.4);
+  ctx.lineTo(x2-ux*s-uy*s*0.4, y2-uy*s+ux*s*0.4);
+  ctx.closePath(); ctx.fillStyle=color; ctx.fill();
+}
+
+function edge(p1, p2, color, dash=[]) {
+  const [x1,y1]=proj(...p1), [x2,y2]=proj(...p2);
+  ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2);
+  ctx.strokeStyle=color; ctx.lineWidth=1;
+  ctx.setLineDash(dash); ctx.stroke(); ctx.setLineDash([]);
+}
+
+function face(pts, fill) {
+  ctx.beginPath();
+  const [x0,y0] = proj(...pts[0]); ctx.moveTo(x0,y0);
+  for (let i=1; i<pts.length; i++) { const [x,y]=proj(...pts[i]); ctx.lineTo(x,y); }
+  ctx.closePath(); ctx.fillStyle=fill; ctx.fill();
+}
+
+function cross3(u,v) {
+  return [u[1]*v[2]-u[2]*v[1], u[2]*v[0]-u[0]*v[2], u[0]*v[1]-u[1]*v[0]];
+}
+function dot3(u,v) { return u[0]*v[0]+u[1]*v[1]+u[2]*v[2]; }
+function add3(u,v) { return [u[0]+v[0],u[1]+v[1],u[2]+v[2]]; }
+
+function update() {
+  ctx.clearRect(0, 0, W, H);
+
+  const O=[0,0,0];
+  const ab=add3(a,b), ac=add3(a,c), bc=add3(b,c), abc=add3(ab,c);
+
+  // axes
+  ctx.strokeStyle='rgba(128,128,128,0.2)'; ctx.lineWidth=0.8;
+  [[3.8,0,0],[0,3.8,0],[0,0,3.8]].forEach(v=>{
+    const[x1,y1]=proj(0,0,0),[x2,y2]=proj(...v);
+    ctx.beginPath(); ctx.moveTo(x1,y1); ctx.lineTo(x2,y2); ctx.stroke();
+  });
+  ctx.fillStyle='rgba(100,100,100,0.45)'; ctx.font='12px sans-serif';
+  const[ax,ay]=proj(4.0,0,0); ctx.fillText('x',ax,ay+4);
+  const[bx2,by2]=proj(0,4.0,0); ctx.fillText('y',bx2+2,by2+4);
+  const[cx2,cy2]=proj(0,0,4.0); ctx.fillText('z',cx2+2,cy2);
+
+  // faces (semi-transparent)
+  face([O,a,ab,b],  'rgba(83,74,183,0.10)');
+  face([O,b,bc,c],  'rgba(29,158,117,0.10)');
+  face([O,a,ac,c],  'rgba(216,90,48,0.10)');
+  face([b,ab,abc,bc],'rgba(83,74,183,0.12)');
+  face([c,ac,abc,bc],'rgba(29,158,117,0.12)');
+  face([a,ab,abc,ac],'rgba(216,90,48,0.12)');
+
+  // edges
+  const da='rgba(83,74,183,0.4)', db='rgba(29,158,117,0.4)', dc='rgba(216,90,48,0.4)';
+  edge(O,a,da); edge(O,b,db); edge(O,c,dc);
+  edge(a,ab,db,[3,3]); edge(a,ac,dc,[3,3]);
+  edge(b,ab,da,[3,3]); edge(b,bc,dc,[3,3]);
+  edge(c,ac,da,[3,3]); edge(c,bc,db,[3,3]);
+  edge(ab,abc,dc); edge(ac,abc,db); edge(bc,abc,da);
+
+  // vectors
+  arrow3(a,'#534AB7');
+  arrow3(b,'#1D9E75');
+  arrow3(c,'#D85A30');
+
+  // vector labels
+  ctx.font='bold 15px sans-serif';
+  const[lax,lay]=proj(a[0]*1.12,a[1]*1.12,a[2]*1.12);
+  ctx.fillStyle='#3C3489'; ctx.fillText('a',lax,lay);
+  const[lbx,lby]=proj(b[0]*1.12,b[1]*1.12,b[2]*1.12);
+  ctx.fillStyle='#085041'; ctx.fillText('b',lbx,lby);
+  const[lcx,lcy]=proj(c[0]*1.12,c[1]*1.12,c[2]*1.12);
+  ctx.fillStyle='#712B13'; ctx.fillText('c',lcx,lcy);
+
+  // compute
+  const bxc   = cross3(b, c);
+  const triple = dot3(a, bxc);
+  const vol    = Math.abs(triple);
+
+  document.getElementById('crossBC').textContent =
+    `(${bxc[0].toFixed(1)}, ${bxc[1].toFixed(1)}, ${bxc[2].toFixed(1)})`;
+  document.getElementById('tripleVal').textContent = triple.toFixed(2);
+  document.getElementById('volVal').textContent    = vol.toFixed(2);
+
+  const box = document.getElementById('interpBox2');
+  if (vol < 0.01) box.textContent = 'Volume = 0 → vectors are coplanar!';
+  else box.textContent = `Parallelepiped volume = ${vol.toFixed(2)}`;
+}
+
+update();
+</script>
+</body>
+</html>
