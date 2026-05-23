@@ -150,28 +150,28 @@ function parse(expr){
   function parseAdd(){
     let left=parseMul();
     while(peek()&&peek().t==='op'&&(peek().v==='+'||peek().v==='-')){
-      const op=eat().v;const right=parseMul();
-      left=(op==='+')?((x,y)=>left(x,y)+right(x,y)):((x,y)=>left(x,y)-right(x,y));
+      const op=eat().v;const right=parseMul();const prev=left;
+      left=(op==='+')?((x,y)=>prev(x,y)+right(x,y)):((x,y)=>prev(x,y)-right(x,y));
     }
     return left;
   }
   function parseMul(){
-    let left=parsePow();
+    let left=parseUnary();
     while(peek()&&peek().t==='op'&&(peek().v==='*'||peek().v==='/')){
-      const op=eat().v;const right=parsePow();
-      left=(op==='*')?((x,y)=>left(x,y)*right(x,y)):((x,y)=>left(x,y)/right(x,y));
+      const op=eat().v;const right=parseUnary();const prev=left;
+      left=(op==='*')?((x,y)=>prev(x,y)*right(x,y)):((x,y)=>prev(x,y)/right(x,y));
     }
     return left;
   }
+  function parseUnary(){
+    if(peek()&&peek().t==='op'&&peek().v==='-'){eat();const a=parsePow();return(x,y)=>-a(x,y);}
+    if(peek()&&peek().t==='op'&&peek().v==='+'){eat();return parsePow();}
+    return parsePow();
+  }
   function parsePow(){
-    let base=parseUnary();
+    let base=parseAtom();
     if(peek()&&peek().t==='op'&&peek().v==='^'){eat();const exp=parseUnary();return(x,y)=>Math.pow(base(x,y),exp(x,y));}
     return base;
-  }
-  function parseUnary(){
-    if(peek()&&peek().t==='op'&&peek().v==='-'){eat();const a=parseAtom();return(x,y)=>-a(x,y);}
-    if(peek()&&peek().t==='op'&&peek().v==='+'){eat();return parseAtom();}
-    return parseAtom();
   }
   const fns1={sin:Math.sin,cos:Math.cos,tan:Math.tan,asin:Math.asin,acos:Math.acos,atan:Math.atan,sqrt:Math.sqrt,exp:Math.exp,log:Math.log,ln:Math.log,abs:Math.abs};
   function parseAtom(){
