@@ -55,8 +55,8 @@
   .toggle.on{background:var(--accent1);}
   .toggle::after{content:'';position:absolute;width:13px;height:13px;background:white;border-radius:50%;top:3px;left:3px;transition:transform .2s;}
   .toggle.on::after{transform:translateX(15px);}
-  .canvas-wrap{flex:1;position:relative;overflow:hidden;}
-  canvas#glCanvas{width:100%;height:100%;display:block;cursor:grab;}
+  .canvas-wrap{flex:1;position:relative;overflow:hidden;background:#04030a;}
+  canvas#glCanvas{position:absolute;top:0;left:0;display:block;cursor:grab;}
   canvas#glCanvas:active{cursor:grabbing;}
   .overlay-info{position:absolute;bottom:14px;right:14px;font-family:'JetBrains Mono',monospace;font-size:.63rem;color:var(--muted);text-align:right;pointer-events:none;}
   .fps{color:var(--accent2);}
@@ -394,9 +394,10 @@ function project(x,y,z){
 let geom=null, glitterPhase=0, lastFrame=performance.now(), fpsTimer=0;
 
 function getSize(){
-  const wrap=canvas.parentElement;
-  const W=wrap.offsetWidth||Math.max(window.innerWidth-320,400);
-  const H=wrap.offsetHeight||Math.max(window.innerHeight-53,400);
+  const wrap=document.querySelector('.canvas-wrap');
+  const rect=wrap.getBoundingClientRect();
+  const W=rect.width>10?rect.width:Math.max(window.innerWidth-320,400);
+  const H=rect.height>10?rect.height:Math.max(window.innerHeight-53,400);
   return{W,H};
 }
 
@@ -404,9 +405,11 @@ function render3D(){
   if(state.dirty){geom=generatePoints();state.dirty=false;}
   if(!geom)return;
   const{W:rW,H:rH}=getSize();
+  if(rW<10||rH<10)return;
   const W=canvas.width=Math.round(rW*devicePixelRatio);
   const H=canvas.height=Math.round(rH*devicePixelRatio);
-  canvas.style.width=rW+'px'; canvas.style.height=rH+'px';
+  canvas.style.width=rW+'px';
+  canvas.style.height=rH+'px';
   ctx2d.clearRect(0,0,W,H);
   const bg=ctx2d.createRadialGradient(W/2,H/2,0,W/2,H/2,Math.max(W,H)*.7);
   bg.addColorStop(0,'#0d0820');bg.addColorStop(1,'#04030a');
@@ -500,9 +503,12 @@ function startArtMode(id){
   artCanvas.classList.add('active');
   canvas.style.display='none';
   const{W:aW,H:aH}=getSize();
-  artCanvas.width=Math.round(aW*devicePixelRatio);
-  artCanvas.height=Math.round(aH*devicePixelRatio);
-  artCanvas.style.width=aW+'px'; artCanvas.style.height=aH+'px';
+  if(aW>10&&aH>10){
+    artCanvas.width=Math.round(aW*devicePixelRatio);
+    artCanvas.height=Math.round(aH*devicePixelRatio);
+    artCanvas.style.width=aW+'px';
+    artCanvas.style.height=aH+'px';
+  }
   if(id==='heart') runHeart();
   else if(id==='rose') runRose();
   else if(id==='prose') runParticleRose();
@@ -1007,7 +1013,14 @@ let lastTouchX=0,lastTouchY=0,lastDist=0;
 // ═══════════════ INIT ═══════════════
 buildPalette();buildBounds();buildPresets();buildArtPresets();buildEqBox();
 state.dirty=true;
-mainLoop();
+// Wait for layout to complete before starting loop
+window.addEventListener('load', ()=>{
+  setTimeout(()=>{ state.dirty=true; mainLoop(); }, 100);
+});
+// Also start immediately in case load already fired
+if(document.readyState==='complete'){
+  setTimeout(()=>{ state.dirty=true; mainLoop(); }, 100);
+}
 </script>
 </body>
 </html>
