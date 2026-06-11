@@ -154,16 +154,16 @@ const state = {
 
 // ═══════════════ PALETTES ═══════════════
 const PALETTES = [
-  {fn:t=>hsl(280+t*120,90,55+t*20)},
-  {fn:t=>hsl(190+t*60,95,45+t*30)},
-  {fn:t=>hsl(t*80,100,50+t*20)},
-  {fn:t=>hsl(t*360,100,60)},
-  {fn:t=>hsl(320+t*60,85,55+t*15)},
-  {fn:t=>hsl(40+t*30,100,50+t*25)},
-  {fn:t=>[0,0.8+t*.2,0.3+t*.4,1]},
-  {fn:t=>hsl(240+t*180,80,50+t*30)},
+  {fn:t=>hsl(270+t*100,65,40+t*25)},
+  {fn:t=>hsl(195+t*50,70,35+t*30)},
+  {fn:t=>hsl(t*70,75,38+t*22)},
+  {fn:t=>hsl(t*300,70,40+t*20)},
+  {fn:t=>hsl(310+t*50,65,40+t*20)},
+  {fn:t=>hsl(38+t*25,80,40+t*25)},
+  {fn:t=>[0,0.55+t*.3,0.25+t*.35,1]},
+  {fn:t=>hsl(235+t*160,65,38+t*28)},
 ];
-const PALETTE_COLORS=['#bf5fff','#00e5ff','#ff4fa3','#ffe156','#ff6a3d','#7fff6a','#39ff14','#e040fb'];
+const PALETTE_COLORS=['#9966cc','#4ab8cc','#cc6688','#ccaa44','#cc6644','#66aa66','#44aa44','#aa44cc'];
 
 function hsl(h,s,l){
   h=((h%360)+360)%360; s/=100; l/=100;
@@ -393,11 +393,20 @@ function project(x,y,z){
 // ═══════════════ 3D RENDER ═══════════════
 let geom=null, glitterPhase=0, lastFrame=performance.now(), fpsTimer=0;
 
+function getSize(){
+  const wrap=canvas.parentElement;
+  const W=wrap.offsetWidth||Math.max(window.innerWidth-320,400);
+  const H=wrap.offsetHeight||Math.max(window.innerHeight-53,400);
+  return{W,H};
+}
+
 function render3D(){
   if(state.dirty){geom=generatePoints();state.dirty=false;}
   if(!geom)return;
-  const W=canvas.width=canvas.offsetWidth*devicePixelRatio;
-  const H=canvas.height=canvas.offsetHeight*devicePixelRatio;
+  const{W:rW,H:rH}=getSize();
+  const W=canvas.width=Math.round(rW*devicePixelRatio);
+  const H=canvas.height=Math.round(rH*devicePixelRatio);
+  canvas.style.width=rW+'px'; canvas.style.height=rH+'px';
   ctx2d.clearRect(0,0,W,H);
   const bg=ctx2d.createRadialGradient(W/2,H/2,0,W/2,H/2,Math.max(W,H)*.7);
   bg.addColorStop(0,'#0d0820');bg.addColorStop(1,'#04030a');
@@ -490,8 +499,10 @@ function startArtMode(id){
   artFrame=0; artParticles=[]; artBirds=[];
   artCanvas.classList.add('active');
   canvas.style.display='none';
-  artCanvas.width=artCanvas.offsetWidth*devicePixelRatio;
-  artCanvas.height=artCanvas.offsetHeight*devicePixelRatio;
+  const{W:aW,H:aH}=getSize();
+  artCanvas.width=Math.round(aW*devicePixelRatio);
+  artCanvas.height=Math.round(aH*devicePixelRatio);
+  artCanvas.style.width=aW+'px'; artCanvas.style.height=aH+'px';
   if(id==='heart') runHeart();
   else if(id==='rose') runRose();
   else if(id==='prose') runParticleRose();
