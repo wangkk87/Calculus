@@ -1,0 +1,1322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CalculusLab — Interactive Calculus Visualizations</title>
+<meta name="description" content="Interactive calculus tools for Calc I, II, and III — limits, derivatives, integrals, series, vectors, and multivariable calculus. Built for the classroom.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#F7FAFA;
+  --paper-2:#EAF1F1;
+  --ink:#15233A;
+  --ink-soft:#445268;
+  --ink-faint:#82909F;
+  --line:#D8E3E3;
+  --grid:#E4ECEC;
+  --white:#FFFFFF;
+
+  /* course hues */
+  --c-calc1:#2563EB;   /* Calc I  — blue   */
+  --c-calc2:#0D9488;   /* Calc II — teal   */
+  --c-calc3:#7C3AED;   /* Calc III— violet */
+
+  --shadow-sm:0 1px 2px rgba(21,35,58,.06), 0 1px 3px rgba(21,35,58,.05);
+  --shadow-md:0 4px 6px rgba(21,35,58,.05), 0 10px 20px rgba(21,35,58,.08);
+  --shadow-lg:0 12px 28px rgba(21,35,58,.12), 0 2px 6px rgba(21,35,58,.06);
+
+  --r-sm:8px; --r-md:14px; --r-lg:22px;
+  --maxw:1180px;
+
+  --display:"Fraunces", Georgia, serif;
+  --body:"Inter", system-ui, sans-serif;
+  --mono:"JetBrains Mono", ui-monospace, monospace;
+}
+
+*{box-sizing:border-box;}
+html{scroll-behavior:smooth;}
+body{
+  margin:0;
+  font-family:var(--body);
+  color:var(--ink);
+  background-color:var(--paper);
+  background-image:
+    linear-gradient(var(--grid) 1px, transparent 1px),
+    linear-gradient(90deg, var(--grid) 1px, transparent 1px);
+  background-size:26px 26px;
+  background-position:-1px -1px;
+  line-height:1.55;
+  -webkit-font-smoothing:antialiased;
+}
+a{color:inherit;}
+button{font-family:inherit;cursor:pointer;}
+canvas{display:block;}
+
+.wrap{max-width:var(--maxw);margin:0 auto;padding:0 24px;}
+
+/* ---------- Top bar ---------- */
+.topbar{position:sticky;top:0;z-index:60;backdrop-filter:saturate(140%) blur(8px);background:rgba(247,250,250,.82);border-bottom:1px solid var(--line);}
+.topbar-inner{display:flex;align-items:center;gap:18px;height:62px;}
+.brand{display:flex;align-items:center;gap:10px;font-family:var(--display);font-weight:600;font-size:1.18rem;letter-spacing:-.01em;cursor:pointer;background:none;border:none;color:var(--ink);padding:0;}
+.brand .mark{width:28px;height:28px;flex:none;}
+.brand .beta{font-family:var(--mono);font-size:.62rem;font-weight:500;color:var(--ink-faint);border:1px solid var(--line);border-radius:99px;padding:2px 7px;letter-spacing:.04em;}
+.topbar nav{margin-left:auto;display:flex;gap:4px;flex-wrap:wrap;}
+.topbar nav a{font-size:.82rem;font-weight:500;text-decoration:none;color:var(--ink-soft);padding:7px 11px;border-radius:99px;transition:.15s;white-space:nowrap;}
+.topbar nav a:hover{color:var(--ink);background:var(--paper-2);}
+
+/* ---------- Hero ---------- */
+.hero{position:relative;overflow:hidden;border-bottom:1px solid var(--line);}
+.hero-inner{display:grid;grid-template-columns:1.05fr 1fr;gap:40px;align-items:center;padding:62px 0 56px;}
+.eyebrow{font-family:var(--mono);font-size:.74rem;letter-spacing:.16em;text-transform:uppercase;color:var(--c-calc2);font-weight:500;margin-bottom:18px;}
+.hero h1{font-family:var(--display);font-weight:600;font-size:clamp(2.4rem,5.2vw,3.9rem);line-height:1.02;letter-spacing:-.02em;margin:0 0 18px;}
+.hero h1 em{font-style:italic;color:var(--c-calc1);}
+.hero p.lead{font-size:1.08rem;color:var(--ink-soft);max-width:46ch;margin:0 0 26px;}
+.hero-cta{display:flex;gap:12px;flex-wrap:wrap;align-items:center;}
+.btn{display:inline-flex;align-items:center;gap:8px;border:none;border-radius:99px;font-weight:600;font-size:.92rem;padding:12px 22px;text-decoration:none;transition:.18s;}
+.btn-primary{background:var(--ink);color:var(--paper);}
+.btn-primary:hover{transform:translateY(-1px);box-shadow:var(--shadow-md);}
+.hero-stat{font-family:var(--mono);font-size:.78rem;color:var(--ink-faint);}
+.hero-stat b{color:var(--ink);font-weight:700;}
+
+.hero-canvas-card{position:relative;background:var(--white);border:1px solid var(--line);border-radius:var(--r-lg);box-shadow:var(--shadow-lg);padding:18px 18px 14px;}
+.hero-canvas-card .cap{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:6px;}
+.hero-canvas-card .cap .ttl{font-family:var(--mono);font-size:.72rem;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-faint);}
+.hero-canvas-card .cap .live{display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:.7rem;color:var(--c-calc2);}
+.hero-canvas-card .cap .live .dot{width:7px;height:7px;border-radius:99px;background:var(--c-calc2);animation:pulse 1.6s infinite;}
+@keyframes pulse{0%,100%{opacity:1;}50%{opacity:.25;}}
+#heroCanvas{width:100%;height:300px;}
+.hero-readout{display:flex;gap:18px;font-family:var(--mono);font-size:.74rem;color:var(--ink-soft);margin-top:8px;border-top:1px dashed var(--line);padding-top:10px;}
+.hero-readout span b{color:var(--ink);}
+
+/* ---------- Category sections ---------- */
+.section{padding:54px 0 8px;}
+.sec-head{display:flex;align-items:center;gap:14px;margin-bottom:22px;}
+.sec-head .num{font-family:var(--mono);font-size:.78rem;color:var(--ink-faint);font-weight:500;}
+.sec-head h2{font-family:var(--display);font-weight:600;font-size:1.7rem;letter-spacing:-.01em;margin:0;display:flex;align-items:center;gap:12px;}
+.sec-head h2::before{content:"";width:13px;height:13px;border-radius:4px;background:var(--cat,var(--ink));}
+.sec-head .desc{font-size:.9rem;color:var(--ink-soft);margin-left:auto;max-width:38ch;text-align:right;}
+
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(248px,1fr));gap:16px;}
+.card{position:relative;text-align:left;background:var(--white);border:1px solid var(--line);border-radius:var(--r-md);padding:18px 18px 16px;cursor:pointer;transition:.18s;display:flex;flex-direction:column;gap:8px;min-height:128px;width:100%;border-top:3px solid var(--cat,var(--ink));}
+.card:hover{transform:translateY(-3px);box-shadow:var(--shadow-md);border-color:var(--cat,var(--line));}
+.card:focus-visible{outline:3px solid var(--cat,var(--ink));outline-offset:2px;}
+.card .ttl{font-weight:600;font-size:1.02rem;letter-spacing:-.01em;line-height:1.2;}
+.card .blurb{font-size:.84rem;color:var(--ink-soft);line-height:1.4;flex:1;}
+.card .tag{font-family:var(--mono);font-size:.64rem;letter-spacing:.05em;text-transform:uppercase;color:var(--cat,var(--ink-faint));font-weight:500;}
+.card .go{position:absolute;right:16px;bottom:14px;color:var(--cat,var(--ink-faint));opacity:0;transform:translateX(-4px);transition:.18s;}
+.card:hover .go{opacity:1;transform:translateX(0);}
+.card .ch{font-family:var(--mono);font-size:.6rem;color:var(--ink-faint);letter-spacing:.04em;}
+
+/* ---------- Applet view ---------- */
+#appletView{display:none;padding:30px 0 80px;min-height:70vh;}
+.app-top{display:flex;align-items:center;gap:14px;margin-bottom:8px;flex-wrap:wrap;}
+.back{display:inline-flex;align-items:center;gap:7px;background:var(--white);border:1px solid var(--line);border-radius:99px;padding:8px 15px;font-weight:600;font-size:.85rem;color:var(--ink);transition:.15s;}
+.back:hover{background:var(--paper-2);transform:translateX(-2px);}
+.app-cat{font-family:var(--mono);font-size:.7rem;letter-spacing:.08em;text-transform:uppercase;font-weight:500;padding:5px 11px;border-radius:99px;color:#fff;}
+.app-head h2{font-family:var(--display);font-weight:600;font-size:2rem;letter-spacing:-.015em;margin:6px 0 6px;}
+.app-head p{color:var(--ink-soft);max-width:70ch;margin:0 0 18px;font-size:.96rem;}
+
+.panel{background:var(--white);border:1px solid var(--line);border-radius:var(--r-md);padding:20px;box-shadow:var(--shadow-sm);}
+.app-grid{display:grid;grid-template-columns:300px 1fr;gap:18px;align-items:start;}
+.controls{display:flex;flex-direction:column;gap:16px;}
+.ctrl{display:flex;flex-direction:column;gap:6px;}
+.ctrl label{font-size:.82rem;font-weight:600;display:flex;justify-content:space-between;align-items:baseline;}
+.ctrl label .val{font-family:var(--mono);color:var(--ink-soft);font-weight:500;}
+.ctrl input[type=range]{width:100%;accent-color:var(--accent,var(--c-calc1));}
+.ctrl input[type=number],.ctrl input[type=text],.ctrl select,.ctrl textarea{font-family:var(--mono);font-size:.88rem;padding:9px 11px;border:1px solid var(--line);border-radius:var(--r-sm);background:var(--paper);color:var(--ink);width:100%;}
+.ctrl textarea{min-height:90px;resize:vertical;line-height:1.5;}
+.ctrl .hint{font-size:.74rem;color:var(--ink-faint);}
+.seg{display:flex;border:1px solid var(--line);border-radius:99px;overflow:hidden;background:var(--paper);}
+.seg button{flex:1;border:none;background:transparent;padding:8px;font-size:.8rem;font-weight:600;color:var(--ink-soft);transition:.15s;}
+.seg button.on{background:var(--accent,var(--c-calc1));color:#fff;}
+.btnrow{display:flex;gap:8px;flex-wrap:wrap;}
+.abtn{border:1px solid var(--line);background:var(--paper);border-radius:var(--r-sm);padding:9px 13px;font-weight:600;font-size:.82rem;color:var(--ink);transition:.15s;flex:1;white-space:nowrap;}
+.abtn:hover{border-color:var(--accent,var(--ink));}
+.abtn.primary{background:var(--accent,var(--c-calc1));color:#fff;border-color:transparent;}
+.abtn.primary:hover{filter:brightness(1.07);}
+.abtn:disabled{opacity:.45;cursor:not-allowed;}
+
+.viz{display:flex;flex-direction:column;gap:14px;}
+.plot-card{background:var(--paper);border:1px solid var(--line);border-radius:var(--r-sm);padding:12px;}
+.plot-card .plot-title{font-family:var(--mono);font-size:.72rem;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-faint);margin-bottom:8px;}
+.plotwrap{width:100%;}
+.plotwrap canvas{width:100%;height:auto;}
+
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px;}
+.stat{background:var(--paper);border:1px solid var(--line);border-radius:var(--r-sm);padding:11px 13px;}
+.stat .k{font-family:var(--mono);font-size:.66rem;letter-spacing:.05em;text-transform:uppercase;color:var(--ink-faint);}
+.stat .v{font-family:var(--mono);font-size:1.18rem;font-weight:700;color:var(--ink);margin-top:2px;word-break:break-word;}
+.stat .v.accent{color:var(--accent,var(--c-calc1));}
+
+.note{font-size:.82rem;color:var(--ink-soft);background:var(--paper-2);border-left:3px solid var(--accent,var(--c-calc1));border-radius:0 var(--r-sm) var(--r-sm) 0;padding:11px 14px;}
+.note b{color:var(--ink);}
+
+.foot{border-top:1px solid var(--line);margin-top:40px;padding:34px 0;color:var(--ink-faint);font-size:.82rem;}
+.foot a{color:var(--ink-soft);text-decoration:none;border-bottom:1px solid var(--line);}
+.foot .row{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap;align-items:center;}
+.foot .brand-sm{font-family:var(--display);font-weight:600;color:var(--ink);font-size:1rem;}
+
+/* ---------- Search bar ---------- */
+.search-wrap{padding:18px 0 4px;}
+.search-box{display:flex;align-items:center;gap:10px;background:var(--white);border:1px solid var(--line);border-radius:99px;padding:10px 18px;box-shadow:var(--shadow-sm);max-width:480px;transition:.18s;}
+.search-box:focus-within{border-color:var(--c-calc1);box-shadow:0 0 0 3px rgba(37,99,235,.12);}
+.search-box svg{color:var(--ink-faint);flex:none;}
+.search-box input{border:none;background:transparent;font-family:var(--body);font-size:.93rem;color:var(--ink);outline:none;width:100%;}
+.search-box input::placeholder{color:var(--ink-faint);}
+#searchEmpty{display:none;text-align:center;padding:40px 0;color:var(--ink-faint);font-size:.9rem;}
+
+/* ---------- Difficulty badges ---------- */
+.diff{display:inline-flex;align-items:center;gap:4px;font-family:var(--mono);font-size:.6rem;font-weight:600;letter-spacing:.06em;text-transform:uppercase;padding:3px 8px;border-radius:99px;margin-left:auto;}
+.diff-intro{background:rgba(13,148,136,.12);color:#0D9488;}
+.diff-inter{background:rgba(245,158,11,.14);color:#B45309;}
+.diff-adv{background:rgba(124,58,237,.14);color:#7C3AED;}
+
+/* ---------- Guiding questions ---------- */
+.guiding{background:linear-gradient(135deg,rgba(37,99,235,.06),rgba(13,148,136,.06));border:1px solid rgba(37,99,235,.15);border-radius:var(--r-md);padding:14px 18px;margin-bottom:16px;}
+.guiding .q-title{font-family:var(--mono);font-size:.66rem;letter-spacing:.1em;text-transform:uppercase;color:var(--c-calc1);font-weight:600;margin-bottom:8px;}
+.guiding ol{margin:0;padding-left:18px;font-size:.84rem;color:var(--ink-soft);line-height:1.7;}
+.guiding ol li{margin-bottom:2px;}
+
+.kbd{display:inline-flex;align-items:center;gap:4px;font-family:var(--mono);font-size:.68rem;color:var(--ink-faint);}
+.kbd kbd{background:var(--paper-2);border:1px solid var(--line);border-radius:4px;padding:1px 5px;font-size:.68rem;}
+
+.share-btn{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:.72rem;font-weight:600;background:var(--paper-2);border:1px solid var(--line);border-radius:99px;padding:6px 13px;cursor:pointer;color:var(--ink-soft);transition:.15s;}
+.share-btn:hover{color:var(--ink);border-color:var(--ink-soft);}
+.share-btn.copied{color:var(--c-calc2);border-color:var(--c-calc2);}
+
+.formula{font-family:var(--mono);font-size:.86rem;background:var(--paper-2);border:1px solid var(--line);border-radius:var(--r-sm);padding:8px 12px;color:var(--ink);overflow-x:auto;}
+
+@media(max-width:880px){
+  .hero-inner{grid-template-columns:1fr;gap:30px;padding:40px 0;}
+  .hero-canvas-card{order:-1;}
+  .app-grid{grid-template-columns:1fr !important;}
+  .app-grid > .panel{order:2;}
+  .app-grid > .viz{order:1;}
+  .sec-head .desc{display:none;}
+  .topbar nav{display:none;}
+  .search-wrap{padding:12px 0 0;}
+  .guiding{margin-bottom:12px;}
+}
+@media(max-width:540px){
+  .wrap{padding:0 14px;}
+  .app-head h2{font-size:1.5rem;}
+  .stats{grid-template-columns:repeat(2,1fr);}
+  .btnrow{flex-direction:column;}
+  .abtn{flex:unset;}
+}
+@media(prefers-reduced-motion:reduce){
+  *{animation-duration:.001ms!important;transition-duration:.001ms!important;}
+}
+.visually-hidden{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="wrap topbar-inner">
+    <button class="brand" onclick="goHome()" aria-label="CalculusLab home">
+      <svg class="mark" viewBox="0 0 32 32" fill="none" aria-hidden="true">
+        <path d="M4 26 C 9 26, 11 6, 16 6 S 23 26, 28 26" stroke="#2563EB" stroke-width="2.6" fill="none" stroke-linecap="round"/>
+        <line x1="4" y1="22" x2="28" y2="10" stroke="#7C3AED" stroke-width="2.2" stroke-linecap="round"/>
+        <rect x="6" y="20" width="3.4" height="6" rx="1" fill="#0D9488" opacity="0.55"/>
+        <rect x="11" y="15" width="3.4" height="11" rx="1" fill="#0D9488" opacity="0.55"/>
+        <rect x="16" y="11" width="3.4" height="15" rx="1" fill="#0D9488" opacity="0.55"/>
+        <circle cx="16" cy="6" r="2.3" fill="#15233A"/>
+      </svg>
+      CalculusLab <span class="beta">v1</span>
+    </button>
+    <nav id="topnav"></nav>
+    <button class="share-btn" id="darkToggle" onclick="toggleDark()" title="Toggle dark mode" aria-label="Toggle dark mode">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" id="darkIcon"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+    </button>
+  </div>
+</header>
+
+<main id="home">
+  <section class="hero">
+    <div class="wrap hero-inner">
+      <div>
+        <div class="eyebrow">Interactive Calculus · Calc I · II · III</div>
+        <h1>See the <em>motion</em>.<br>Not just the symbols.</h1>
+        <p class="lead">A hands-on collection of visualizations for learning calculus — drag a secant into a tangent, watch Riemann sums fill an area, build a Taylor series term by term, and rotate vectors in 3D. Built for the classroom.</p>
+        <div class="hero-cta">
+          <a class="btn btn-primary" href="#calc1">Explore the tools →</a>
+          <span class="hero-stat"><b id="appletCount">0</b> live tools · <b>3</b> courses</span>
+        </div>
+      </div>
+      <div class="hero-canvas-card">
+        <div class="cap">
+          <span class="ttl">Secant slope → tangent slope</span>
+          <span class="live"><span class="dot"></span>h → 0</span>
+        </div>
+        <canvas id="heroCanvas" width="560" height="300" aria-label="An animation of a secant line converging to a tangent line as h approaches zero"></canvas>
+        <div class="hero-readout">
+          <span>h <b id="heroH">—</b></span>
+          <span>secant slope <b id="heroSlope">—</b></span>
+          <span>f′(x) <b id="heroDeriv">—</b></span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <div class="wrap">
+    <div class="search-wrap">
+      <div class="search-box">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/></svg>
+        <input id="searchInput" type="search" placeholder="Search tools… (limits, integrals, Taylor, gradient)" autocomplete="off" oninput="filterCatalog(this.value)" onkeydown="if(event.key==='Escape')this.value='',filterCatalog('')">
+      </div>
+    </div>
+    <div id="searchEmpty">No tools match your search. Try a different keyword.</div>
+  </div>
+  <div class="wrap" id="catalog"></div>
+
+  <footer class="foot">
+    <div class="wrap row">
+      <div>
+        <div class="brand-sm">CalculusLab</div>
+        <div style="margin-top:6px;max-width:52ch;">Free to use, remix, and share. Numerical methods are approximate — meant for intuition, not proof.</div>
+      </div>
+      <div style="text-align:right;font-family:var(--mono);font-size:.76rem;line-height:1.9;">
+        KW &amp; Calculus.
+      </div>
+    </div>
+  </footer>
+</main>
+
+<section id="appletView" aria-live="polite"></section>
+
+<script>
+/* =====================================================================
+   CalculusLab — single-file interactive calculus collection
+   Sections:  (1) math utils  (2) plot helpers  (3) applets
+              (4) catalog/registry  (5) router + hero animation
+   ===================================================================== */
+
+/* ----------------------------- (1) MATH ----------------------------- */
+const M = {
+  TAU:2*Math.PI,
+  sum(a){ return a.reduce((s,x)=>s+x,0); },
+  mean(a){ return a.length? M.sum(a)/a.length : 0; },
+  min(a){ return Math.min(...a); }, max(a){ return Math.max(...a); },
+  round(x,d=2){ if(!isFinite(x))return x; const f=10**d; return Math.round(x*f)/f; },
+  clamp(x,lo,hi){ return Math.max(lo,Math.min(hi,x)); },
+  lerp(a,b,t){ return a+(b-a)*t; },
+  factorial(n){ let r=1; for(let i=2;i<=n;i++)r*=i; return r; },
+  // numerical first derivative (central difference)
+  nderiv(f,x,h=1e-4){ return (f(x+h)-f(x-h))/(2*h); },
+  // numerical second derivative
+  nderiv2(f,x,h=1e-3){ return (f(x+h)-2*f(x)+f(x-h))/(h*h); },
+  // composite Simpson's rule (n forced even)
+  integrate(f,a,b,n=400){ if(a===b)return 0; if(n%2)n++; const h=(b-a)/n; let s=f(a)+f(b);
+    for(let i=1;i<n;i++){ const x=a+i*h; s+= (i%2? 4:2)*f(x); }
+    let r=s*h/3; return isFinite(r)? r : NaN; },
+  // Riemann sum with a chosen rule
+  riemann(f,a,b,n,mode){ const h=(b-a)/n; let s=0;
+    for(let i=0;i<n;i++){ const xl=a+i*h, xr=xl+h;
+      if(mode==='left')      s+=f(xl)*h;
+      else if(mode==='right')s+=f(xr)*h;
+      else if(mode==='mid')  s+=f((xl+xr)/2)*h;
+      else if(mode==='trap') s+=(f(xl)+f(xr))/2*h;
+    } return s; },
+  // ----- vectors (arrays of length 2 or 3) -----
+  vadd(a,b){ return a.map((x,i)=>x+b[i]); },
+  vsub(a,b){ return a.map((x,i)=>x-b[i]); },
+  vscale(a,s){ return a.map(x=>x*s); },
+  dot(a,b){ return a.reduce((s,x,i)=>s+x*b[i],0); },
+  vlen(a){ return Math.sqrt(M.dot(a,a)); },
+  cross(a,b){ return [a[1]*b[2]-a[2]*b[1], a[2]*b[0]-a[0]*b[2], a[0]*b[1]-a[1]*b[0]]; },
+  vnorm(a){ const L=M.vlen(a); return L? a.map(x=>x/L):a.slice(); },
+  // gradient of a 2-var function g(x,y) -> [gx,gy]
+  grad(g,x,y,h=1e-4){ return [(g(x+h,y)-g(x-h,y))/(2*h), (g(x,y+h)-g(x,y-h))/(2*h)]; },
+};
+
+/* ---------- tiny safe math expression parser ----------
+   Supports: + - * / ^ , parentheses, unary minus, variables,
+   and named functions/constants. Compiles to a JS function. */
+function compileExpr(src, vars){
+  const fns = {
+    sin:'Math.sin', cos:'Math.cos', tan:'Math.tan',
+    asin:'Math.asin', acos:'Math.acos', atan:'Math.atan',
+    sinh:'Math.sinh', cosh:'Math.cosh', tanh:'Math.tanh',
+    exp:'Math.exp', log:'Math.log', ln:'Math.log', log10:'Math.log10',
+    sqrt:'Math.sqrt', abs:'Math.abs', sign:'Math.sign',
+    floor:'Math.floor', ceil:'Math.ceil', round:'Math.round',
+    atan2:'Math.atan2', pow:'Math.pow', min:'Math.min', max:'Math.max'
+  };
+  const consts = { pi:'Math.PI', e:'Math.E' };
+  let s = (src||'').toLowerCase().replace(/\s+/g,'');
+  if(!s) throw new Error('empty expression');
+  // implicit multiplication: 2x -> 2*x , )( -> )*( , x( handled below carefully
+  // tokenize
+  let js = '';
+  let i = 0;
+  const isAlpha = c=>/[a-z]/.test(c);
+  const isDigit = c=>/[0-9.]/.test(c);
+  while(i < s.length){
+    let c = s[i];
+    if(isDigit(c)){
+      let num=''; while(i<s.length && isDigit(s[i])){ num+=s[i++]; }
+      js += num;
+      // implicit mult: number followed by variable/( /function
+      if(i<s.length && (isAlpha(s[i]) || s[i]==='(')) js += '*';
+      continue;
+    }
+    if(isAlpha(c)){
+      let name=''; while(i<s.length && /[a-z0-9]/.test(s[i])){ name+=s[i++]; }
+      if(fns[name]){ js += fns[name]; if(s[i]!=='(') throw new Error(name+' needs ()'); }
+      else if(consts[name]){ js += consts[name];
+        if(i<s.length && (isAlpha(s[i])||s[i]==='('||isDigit(s[i]))) js+='*'; }
+      else if(vars.includes(name)){ js += name;
+        if(i<s.length && (isAlpha(s[i])||s[i]==='('||isDigit(s[i]))) js+='*'; }
+      else throw new Error('unknown name: '+name);
+      continue;
+    }
+    if(c==='^'){ // turn a^b into Math.pow via marker: we'll handle with a stack-free trick
+      js += '**'; i++; continue;
+    }
+    if('+-*/(),'.includes(c)){
+      js += c; i++;
+      // implicit mult after ) before ( or var or digit
+      if(c===')' && i<s.length && (isAlpha(s[i])||isDigit(s[i])||s[i]==='(')) js += '*';
+      continue;
+    }
+    throw new Error('bad character: '+c);
+  }
+  const fn = new Function(...vars, 'return ('+js+');');
+  // smoke test
+  const test = fn(...vars.map(()=>0.37));
+  if(typeof test!=='number') throw new Error('not numeric');
+  return fn;
+}
+
+/* --------------------------- (2) PLOTTING --------------------------- */
+const COL = {
+  calc1:'#2563EB', calc2:'#0D9488', calc3:'#7C3AED',
+  ink:'#15233A', soft:'#445268', faint:'#82909F', line:'#D8E3E3', grid:'#E4ECEC', paper:'#F7FAFA',
+  coral:'#F43F5E', amber:'#F59E0B', green:'#16A34A', cyan:'#06B6D4', rose:'#E11D48', slate:'#64748B'
+};
+function hexA(hex,a){ const n=parseInt(hex.slice(1),16); return `rgba(${(n>>16)&255},${(n>>8)&255},${n&255},${a})`; }
+
+class Chart{
+  constructor(canvas,{m={t:16,r:16,b:34,l:46},cssH=null}={}){
+    this.c=canvas; this.ctx=canvas.getContext('2d'); this.m=m; this.cssH=cssH; this.resize();
+  }
+  resize(){
+    const cssW=this.c.clientWidth||this.c.parentElement.clientWidth||520;
+    const cssH=this.cssH|| Math.round(cssW*0.62);
+    const dpr=window.devicePixelRatio||1;
+    this.c.style.height=cssH+'px';
+    this.c.width=cssW*dpr; this.c.height=cssH*dpr;
+    this.ctx.setTransform(dpr,0,0,dpr,0,0);
+    this.W=cssW; this.H=cssH;
+    this.px0=this.m.l; this.px1=cssW-this.m.r; this.py0=cssH-this.m.b; this.py1=this.m.t;
+  }
+  setX(min,max){ this.xmin=min; this.xmax=max===min?min+1:max; return this; }
+  setY(min,max){ this.ymin=min; this.ymax=max===min?min+1:max; return this; }
+  X(v){ return this.px0+(v-this.xmin)/(this.xmax-this.xmin)*(this.px1-this.px0); }
+  Y(v){ return this.py0+(v-this.ymin)/(this.ymax-this.ymin)*(this.py1-this.py0); }
+  ix(px){ return this.xmin+(px-this.px0)/(this.px1-this.px0)*(this.xmax-this.xmin); }
+  iy(py){ return this.ymin+(py-this.py0)/(this.py1-this.py0)*(this.ymax-this.ymin); }
+  clear(){ this.ctx.clearRect(0,0,this.W,this.H); }
+  frame(){ const ctx=this.ctx; ctx.strokeStyle=COL.line; ctx.lineWidth=1; ctx.strokeRect(this.px0,this.py1,this.px1-this.px0,this.py0-this.py1); }
+  gridlines(xt,yt){ const ctx=this.ctx; ctx.strokeStyle=COL.grid; ctx.lineWidth=1;
+    if(xt) xt.forEach(t=>{ const x=this.X(t); ctx.beginPath(); ctx.moveTo(x,this.py1); ctx.lineTo(x,this.py0); ctx.stroke(); });
+    if(yt) yt.forEach(t=>{ const y=this.Y(t); ctx.beginPath(); ctx.moveTo(this.px0,y); ctx.lineTo(this.px1,y); ctx.stroke(); }); }
+  axes(){ // draw x=0 / y=0 axis lines if in range
+    const ctx=this.ctx; ctx.strokeStyle=COL.faint; ctx.lineWidth=1.4;
+    if(this.ymin<0&&this.ymax>0){ const y=this.Y(0); ctx.beginPath(); ctx.moveTo(this.px0,y); ctx.lineTo(this.px1,y); ctx.stroke(); }
+    if(this.xmin<0&&this.xmax>0){ const x=this.X(0); ctx.beginPath(); ctx.moveTo(x,this.py1); ctx.lineTo(x,this.py0); ctx.stroke(); } }
+  axisX(ticks,fmt=(v)=>(''+M.round(v,2))){ const ctx=this.ctx; ctx.fillStyle=COL.soft; ctx.font='11px "JetBrains Mono",monospace'; ctx.textAlign='center'; ctx.textBaseline='top';
+    ticks.forEach(t=>{ const x=this.X(t); ctx.strokeStyle=COL.line; ctx.beginPath(); ctx.moveTo(x,this.py0); ctx.lineTo(x,this.py0+4); ctx.stroke(); ctx.fillText(fmt(t),x,this.py0+7); }); }
+  axisY(ticks,fmt=(v)=>(''+M.round(v,2))){ const ctx=this.ctx; ctx.fillStyle=COL.soft; ctx.font='11px "JetBrains Mono",monospace'; ctx.textAlign='right'; ctx.textBaseline='middle';
+    ticks.forEach(t=>{ const y=this.Y(t); ctx.strokeStyle=COL.grid; ctx.beginPath(); ctx.moveTo(this.px0-4,y); ctx.lineTo(this.px0,y); ctx.stroke(); ctx.fillText(fmt(t),this.px0-7,y); }); }
+  bars(bins,color){ const ctx=this.ctx;
+    bins.forEach((b)=>{ if(b.count<=0)return; const x=this.X(b.lo), w=this.X(b.hi)-this.X(b.lo)-1, y=this.Y(b.count);
+      ctx.fillStyle=color; ctx.fillRect(x+0.5,y,Math.max(1,w),this.py0-y); ctx.strokeStyle=COL.paper; ctx.lineWidth=1; ctx.strokeRect(x+0.5,y,Math.max(1,w),this.py0-y); }); }
+  points(xs,ys,color,r=4){ const ctx=this.ctx; for(let i=0;i<xs.length;i++){ ctx.fillStyle=color; ctx.beginPath(); ctx.arc(this.X(xs[i]),this.Y(ys[i]),r,0,7); ctx.fill(); ctx.strokeStyle=COL.paper; ctx.lineWidth=1; ctx.stroke(); } }
+  dot(x,y,color,r=4){ const ctx=this.ctx; ctx.fillStyle=color; ctx.beginPath(); ctx.arc(this.X(x),this.Y(y),r,0,7); ctx.fill(); ctx.strokeStyle=COL.paper; ctx.lineWidth=1.5; ctx.stroke(); }
+  line(x0,y0,x1,y1,color,w=2,dash=[]){ const ctx=this.ctx; ctx.save(); ctx.setLineDash(dash); ctx.strokeStyle=color; ctx.lineWidth=w; ctx.beginPath(); ctx.moveTo(this.X(x0),this.Y(y0)); ctx.lineTo(this.X(x1),this.Y(y1)); ctx.stroke(); ctx.restore(); }
+  pline(px,py,color,w=2,dash=[]){ const ctx=this.ctx; ctx.save(); ctx.setLineDash(dash); ctx.strokeStyle=color; ctx.lineWidth=w; ctx.beginPath(); ctx.moveTo(px[0],py[0]); for(let i=1;i<px.length;i++)ctx.lineTo(px[i],py[i]); ctx.stroke(); ctx.restore(); }
+  vline(x,color,w=2,dash=[]){ const ctx=this.ctx; ctx.save(); ctx.setLineDash(dash); ctx.strokeStyle=color; ctx.lineWidth=w; ctx.beginPath(); ctx.moveTo(this.X(x),this.py1); ctx.lineTo(this.X(x),this.py0); ctx.stroke(); ctx.restore(); }
+  // plot y=f(x); breaks the path across large jumps (asymptotes)
+  curve(fn,color,w=2.2,n=400){ const ctx=this.ctx; ctx.strokeStyle=color; ctx.lineWidth=w; ctx.lineJoin='round'; ctx.beginPath();
+    let pen=false, prevY=null; const yspan=this.ymax-this.ymin;
+    for(let i=0;i<=n;i++){ const x=this.xmin+(this.xmax-this.xmin)*i/n; let y=fn(x);
+      if(!isFinite(y)){ pen=false; prevY=null; continue; }
+      const px=this.X(x), py=this.Y(M.clamp(y,this.ymin-yspan*4,this.ymax+yspan*4));
+      const jump = prevY!==null && Math.abs(y-prevY) > yspan*3;
+      if(!pen || jump){ ctx.moveTo(px,py); pen=true; } else ctx.lineTo(px,py);
+      prevY=y;
+    } ctx.stroke(); }
+  // shade region under f from a to b down to y=0 (or to g)
+  shade(fn,a,b,color,n=160,gn=null){ const ctx=this.ctx; ctx.fillStyle=color; ctx.beginPath();
+    const g = gn || (()=>0);
+    ctx.moveTo(this.X(a),this.Y(g(a)));
+    for(let i=0;i<=n;i++){ const x=a+(b-a)*i/n; ctx.lineTo(this.X(x),this.Y(fn(x))); }
+    for(let i=n;i>=0;i--){ const x=a+(b-a)*i/n; ctx.lineTo(this.X(x),this.Y(g(x))); }
+    ctx.closePath(); ctx.fill(); }
+  marker(x,label,color){ const ctx=this.ctx; this.vline(x,color,2,[4,3]); ctx.fillStyle=color; ctx.font='bold 10px "JetBrains Mono",monospace'; ctx.textAlign='center'; ctx.textBaseline='bottom'; ctx.fillText(label,this.X(x),this.py1+11); }
+  arrow(x0,y0,x1,y1,color,w=2){ const ctx=this.ctx; const X0=this.X(x0),Y0=this.Y(y0),X1=this.X(x1),Y1=this.Y(y1);
+    ctx.strokeStyle=color; ctx.fillStyle=color; ctx.lineWidth=w; ctx.beginPath(); ctx.moveTo(X0,Y0); ctx.lineTo(X1,Y1); ctx.stroke();
+    const ang=Math.atan2(Y1-Y0,X1-X0), s=7; ctx.beginPath(); ctx.moveTo(X1,Y1); ctx.lineTo(X1-s*Math.cos(ang-0.4),Y1-s*Math.sin(ang-0.4)); ctx.lineTo(X1-s*Math.cos(ang+0.4),Y1-s*Math.sin(ang+0.4)); ctx.closePath(); ctx.fill(); }
+}
+function niceTicks(min,max,n=6){ const span=max-min||1; const step0=span/n; const mag=Math.pow(10,Math.floor(Math.log10(step0)));
+  const norm=step0/mag; let step; if(norm<1.5)step=1; else if(norm<3)step=2; else if(norm<7)step=5; else step=10; step*=mag;
+  const t=[]; let v=Math.ceil(min/step)*step; while(v<=max+1e-9){ t.push(M.round(v,6)); v+=step; } return t; }
+/* ----------------------- (3) UI + REGISTRY -------------------------- */
+const CATS = {
+  calc1:{name:'Calculus I',   color:COL.calc1, n:'01', desc:'Functions, limits, derivatives, and the integral. Chapters 1–5.'},
+  calc2:{name:'Calculus II',  color:COL.calc2, n:'02', desc:'Integration applications & techniques, series, polar curves. Chapters 6–8, 10–11.'},
+  calc3:{name:'Calculus III', color:COL.calc3, n:'03', desc:'Vectors, multivariable functions, and multiple integrals. Chapters 12–15.'},
+};
+const APPLETS = [];
+const add = (a)=>APPLETS.push(a);
+
+const UI = {
+  appGrid(controls,viz){ const g=document.createElement('div'); g.className='app-grid';
+    const c=document.createElement('div'); c.className='panel'; const cc=document.createElement('div'); cc.className='controls'; controls.forEach(x=>cc.appendChild(x)); c.appendChild(cc);
+    const v=document.createElement('div'); v.className='viz'; viz.forEach(x=>v.appendChild(x));
+    if(window.innerWidth<=880){ g.append(v,c); } else { g.append(c,v); }
+    return g; },
+  slider({label,min,max,step=1,value,fmt=(v)=>v,oninput}){ const w=document.createElement('div'); w.className='ctrl';
+    w.innerHTML=`<label>${label}<span class="val"></span></label><input type="range" min="${min}" max="${max}" step="${step}" value="${value}">`;
+    const inp=w.querySelector('input'), val=w.querySelector('.val'); const upd=()=>val.textContent=fmt(+inp.value); upd();
+    inp.addEventListener('input',()=>{ upd(); oninput(+inp.value); }); w.get=()=>+inp.value; w.set=(v)=>{inp.value=v;upd();}; w.setFmt=(f)=>{w._f=f;}; return w; },
+  text({label,value,hint,onchange,mono=true}){ const w=document.createElement('div'); w.className='ctrl';
+    w.innerHTML=`<label>${label}</label><input type="text" value="${value}">${hint?`<span class="hint">${hint}</span>`:''}`;
+    const inp=w.querySelector('input'); if(!mono)inp.style.fontFamily='var(--body)';
+    inp.addEventListener('input',()=>onchange(inp.value)); inp.addEventListener('change',()=>onchange(inp.value));
+    w.get=()=>inp.value; w.set=(v)=>inp.value=v; w.input=inp; return w; },
+  number({label,value,step='any',min,max,hint,onchange}){ const w=document.createElement('div'); w.className='ctrl';
+    w.innerHTML=`<label>${label}</label><input type="number" value="${value}" step="${step}" ${min!=null?`min="${min}"`:''} ${max!=null?`max="${max}"`:''}>${hint?`<span class="hint">${hint}</span>`:''}`;
+    const inp=w.querySelector('input'); inp.addEventListener('input',()=>onchange(+inp.value)); w.get=()=>+inp.value; w.set=(v)=>inp.value=v; return w; },
+  textarea({label,value,hint,onchange}){ const w=document.createElement('div'); w.className='ctrl';
+    w.innerHTML=`<label>${label}</label><textarea>${value}</textarea>${hint?`<span class="hint">${hint}</span>`:''}`;
+    const t=w.querySelector('textarea'); t.addEventListener('input',()=>onchange(t.value)); w.get=()=>t.value; w.set=(v)=>t.value=v; return w; },
+  seg({label,options,value,onchange}){ const w=document.createElement('div'); w.className='ctrl';
+    w.innerHTML=`${label?`<label>${label}</label>`:''}<div class="seg"></div>`; const seg=w.querySelector('.seg');
+    options.forEach(o=>{ const b=document.createElement('button'); b.textContent=o.label; b.className=o.value===value?'on':''; b.onclick=()=>{ seg.querySelectorAll('button').forEach(x=>x.classList.remove('on')); b.classList.add('on'); w._v=o.value; onchange(o.value); }; seg.appendChild(b); }); w._v=value; w.get=()=>w._v; w.set=(v)=>{ w._v=v; [...seg.children].forEach((b,idx)=>b.classList.toggle('on',options[idx].value===v)); }; return w; },
+  select({label,options,value,onchange}){ const w=document.createElement('div'); w.className='ctrl';
+    w.innerHTML=`<label>${label}</label><select>${options.map(o=>`<option value="${o.value}" ${o.value===value?'selected':''}>${o.label}</option>`).join('')}</select>`;
+    const s=w.querySelector('select'); s.addEventListener('change',()=>onchange(s.value)); w.get=()=>s.value; w.set=(v)=>s.value=v; return w; },
+  buttons(list){ const w=document.createElement('div'); w.className='ctrl'; const row=document.createElement('div'); row.className='btnrow'; w.appendChild(row);
+    let primaryBtn=null;
+    list.forEach(b=>{ const btn=document.createElement('button'); btn.className='abtn'+(b.primary?' primary':''); btn.textContent=b.label; btn.onclick=b.onclick; b.ref&&b.ref(btn);
+      if(b.primary){ primaryBtn=btn; btn.title='Press Enter to run'; }
+      row.appendChild(btn); });
+    if(primaryBtn){ w._primaryBtn=primaryBtn; }
+    return w; },
+  statsBox(){ const w=document.createElement('div'); w.className='stats'; w.set=(arr)=>{ w.innerHTML=arr.map(s=>`<div class="stat"><div class="k">${s.k}</div><div class="v ${s.accent?'accent':''}">${s.v}</div></div>`).join(''); }; return w; },
+  plotCard(title,h=null){ const w=document.createElement('div'); w.className='plot-card';
+    w.innerHTML=`<div class="plot-title">${title}</div><div class="plotwrap"><canvas></canvas></div>`;
+    const cv=w.querySelector('canvas'); w.canvas=cv; w.chart=(opts)=>new Chart(cv,Object.assign(h?{cssH:h}:{},opts||{})); w.setTitle=(t)=>w.querySelector('.plot-title').textContent=t; return w; },
+  note(html){ const w=document.createElement('div'); w.className='note'; w.innerHTML=html; return w; },
+  formula(html){ const w=document.createElement('div'); w.className='formula'; w.innerHTML=html; w.set=(h)=>w.innerHTML=h; return w; }
+};
+
+/* helper: build a compiled function from a text input, with safe fallback + error display */
+function makeFnInput(label,initial,vars,onok,hint){
+  let current=null, ready=false;
+  const w=UI.text({label,value:initial,hint:hint||`use ${vars.join(', ')}; functions: sin, cos, exp, ln, sqrt, ^ for powers`,onchange:src=>tryCompile(src,true)});
+  const err=document.createElement('div'); err.className='hint'; err.style.color=COL.coral; w.appendChild(err);
+  function tryCompile(src,fire){ try{ const f=compileExpr(src,vars); current=f; err.textContent=''; w.input.style.borderColor=''; if(fire&&ready)onok(f); }
+    catch(e){ err.textContent='⚠ '+e.message; w.input.style.borderColor=COL.coral; } }
+  tryCompile(initial,false); // set current without firing render (caller renders explicitly)
+  ready=true;
+  w.fn=()=>current;
+  return w;
+}
+/* =====================================================================
+   CALCULUS I  (Chapters 1–5)
+   ===================================================================== */
+
+/* ----- 1. Function Transformer (Ch 1.3) ----- */
+add({ id:'function-transforms', cat:'calc1', tag:'explore', title:'Function Transformer', diff:'intro', ch:'Ch 1.3',
+  questions:['Does multiplying by a stretch the graph vertically or horizontally?','How is a horizontal shift c different in sign from what you might expect?','Which transformations change where the function crosses the x-axis?'],
+  blurb:'See how a·f(b(x−c))+d shifts, stretches, and reflects a base function in real time.',
+  build(host){
+    const bases={ 'x^2':x=>x*x, 'x^3':x=>x*x*x, '|x|':x=>Math.abs(x), 'sqrt(x)':x=>x>=0?Math.sqrt(x):NaN, 'sin(x)':Math.sin, 'e^x':Math.exp, '1/x':x=>x!==0?1/x:NaN };
+    let key='x^2';
+    const sel=UI.select({label:'Base function f(x)',options:Object.keys(bases).map(k=>({label:k,value:k})),value:key,onchange:v=>{key=v;render();}});
+    const a=UI.slider({label:'a · vertical stretch / reflect',min:-3,max:3,step:.1,value:1,fmt:v=>v.toFixed(1),oninput:render});
+    const b=UI.slider({label:'b · horizontal stretch / reflect',min:-3,max:3,step:.1,value:1,fmt:v=>v.toFixed(1),oninput:render});
+    const c=UI.slider({label:'c · horizontal shift',min:-4,max:4,step:.1,value:0,fmt:v=>v.toFixed(1),oninput:render});
+    const d=UI.slider({label:'d · vertical shift',min:-4,max:4,step:.1,value:0,fmt:v=>v.toFixed(1),oninput:render});
+    const reset=UI.buttons([{label:'Reset to f(x)',onclick:()=>{a.set(1);b.set(1);c.set(0);d.set(0);render();}}]);
+    const f=UI.formula(''); const plot=UI.plotCard('y = a · f(b(x − c)) + d',360);
+    host.appendChild(UI.appGrid([sel,a,b,c,d,reset,f,UI.note('The <b>base</b> graph is faint; the <b>transformed</b> graph is bold. Note that <b>c</b> shifts <em>right</em> when positive, and <b>b</b> compresses horizontally when |b| > 1.')],[plot]));
+    function render(){
+      const A=a.get(),B=b.get(),C=c.get(),D=d.get(),base=bases[key];
+      const g=x=>A*base(B*(x-C))+D;
+      f.set(`y = ${M.round(A,1)} · f( ${M.round(B,1)}( x ${C>=0?'−':'+'} ${Math.abs(M.round(C,1))} ) ) ${D>=0?'+':'−'} ${Math.abs(M.round(D,1))}`);
+      const ch=plot.chart(); ch.setX(-6,6).setY(-6,6); ch.clear();
+      ch.gridlines(niceTicks(-6,6,6),niceTicks(-6,6,6)); ch.axes(); ch.axisX(niceTicks(-6,6,6)); ch.axisY(niceTicks(-6,6,6));
+      ch.curve(base,hexA(COL.slate,.5),2);
+      ch.curve(g,COL.calc1,2.6);
+    }
+    render();
+  }
+});
+
+/* ----- 2. Limit Explorer (Ch 2.2) ----- */
+add({ id:'limit-explorer', cat:'calc1', tag:'interactive', title:'Limit Explorer', diff:'intro', ch:'Ch 2.2',
+  questions:['Do the left and right values approach the same number? What does that tell you?','Does the limit care about the actual value f(a), or only nearby values?','Try (sin x)/x at x=0 — the function is undefined there, yet the limit exists. Why?'],
+  blurb:'Approach a point from both sides and watch a table of f(x) values close in on the limit.',
+  build(host){
+    const fin=makeFnInput('Function f(x)','sin(x)/x',['x'],()=>render(),'try (x^2-1)/(x-1), or sin(x)/x');
+    const aIn=UI.number({label:'Approach x → a',value:0,step:'any',onchange:render});
+    const plot=UI.plotCard('Zooming in on x = a',300);
+    const tbl=document.createElement('div'); tbl.className='formula'; tbl.style.lineHeight='1.9';
+    host.appendChild(UI.appGrid([fin,aIn,UI.note('The table shows f(x) as x creeps toward a from the left (x < a) and right (x > a). If both columns head to the same number, that number is the <b>limit</b> — even when f(a) itself is undefined.'),tbl],[plot]));
+    function render(){
+      const f=fin.fn(); if(!f)return; const a=aIn.get();
+      const offs=[1,0.5,0.1,0.01,0.001];
+      const left=offs.map(o=>({x:a-o,y:f(a-o)})), right=offs.slice().reverse().map(o=>({x:a+o,y:f(a+o)}));
+      let rows='<b>x → a⁻ (from left)</b><br>';
+      left.forEach(p=>{ rows+=`x=${M.round(p.x,4)} → f(x)=${isFinite(p.y)?M.round(p.y,5):'undefined'}<br>`; });
+      rows+='<br><b>x → a⁺ (from right)</b><br>';
+      right.forEach(p=>{ rows+=`x=${M.round(p.x,4)} → f(x)=${isFinite(p.y)?M.round(p.y,5):'undefined'}<br>`; });
+      const fa=f(a); rows+=`<br>f(${M.round(a,3)}) = ${isFinite(fa)?M.round(fa,5):'<span style="color:'+COL.coral+'">undefined</span>'}`;
+      const Lest=f(a+1e-6), Lest2=f(a-1e-6);
+      if(isFinite(Lest)&&isFinite(Lest2)&&Math.abs(Lest-Lest2)<1e-3)
+        rows+=`<br><b style="color:${COL.calc1}">limit ≈ ${M.round((Lest+Lest2)/2,5)}</b>`;
+      else rows+=`<br><b style="color:${COL.coral}">left ≠ right → limit does not exist</b>`;
+      tbl.innerHTML=rows;
+      // plot zoomed near a
+      const span=2; const ch=plot.chart(); ch.setX(a-span,a+span);
+      const ys=[]; for(let i=0;i<=80;i++){ const x=a-span+2*span*i/80; const y=f(x); if(isFinite(y)&&Math.abs(y)<1e4)ys.push(y); }
+      const ylo=ys.length?M.min(ys):-2, yhi=ys.length?M.max(ys):2; const pad=(yhi-ylo)*0.15||1;
+      ch.setY(ylo-pad,yhi+pad); ch.clear(); ch.gridlines(niceTicks(a-span,a+span,5),niceTicks(ylo-pad,yhi+pad,5)); ch.axes();
+      ch.axisX(niceTicks(a-span,a+span,5)); ch.axisY(niceTicks(ylo-pad,yhi+pad,5));
+      ch.curve(f,COL.calc1,2.4); ch.vline(a,hexA(COL.coral,.6),1.5,[4,3]);
+      if(isFinite(Lest)) ch.dot(a,(Lest+Lest2)/2,COL.coral,5);
+    }
+    render();
+  }
+});
+
+/* ----- 3. Epsilon–Delta (Ch 2.4) ----- */
+add({ id:'epsilon-delta', cat:'calc1', tag:'interactive', title:'The ε–δ Definition', diff:'inter', ch:'Ch 2.4',
+  questions:['When you shrink ε, must δ also shrink? Is that always possible?','What does it mean geometrically that "for every ε there is a δ"?','Where does the band fail for a function with a jump discontinuity?'],
+  blurb:'Set a tolerance ε around the limit L, then find a δ so the graph stays inside the box.',
+  build(host){
+    const fin=makeFnInput('Function f(x)','x^2',['x'],()=>render());
+    const aIn=UI.number({label:'point a',value:2,step:'any',onchange:render});
+    const eps=UI.slider({label:'ε (vertical tolerance)',min:.05,max:2,step:.05,value:1,fmt:v=>v.toFixed(2),oninput:render});
+    const del=UI.slider({label:'δ (horizontal width)',min:.02,max:2,step:.02,value:.4,fmt:v=>v.toFixed(2),oninput:render});
+    const auto=UI.buttons([{label:'Auto-find largest δ',primary:true,onclick:autoDelta}]);
+    const plot=UI.plotCard('Does the curve stay in the green box?',360);
+    const verdict=UI.note('');
+    host.appendChild(UI.appGrid([fin,aIn,eps,del,auto,UI.note('Pick ε first. The challenge is to choose <b>δ</b> so that whenever 0 < |x − a| < δ, the output stays within ε of L. The green box must contain the curve across its full width.'),verdict],[plot]));
+    function render(){
+      const f=fin.fn(); if(!f)return; const a=aIn.get(), L=f(a), e=eps.get(), dl=del.get();
+      const span=Math.max(2.5, dl*2.5); const ch=plot.chart(); ch.setX(a-span,a+span);
+      const ylo=L-Math.max(3,e*3), yhi=L+Math.max(3,e*3); ch.setY(ylo,yhi); ch.clear();
+      ch.gridlines(niceTicks(a-span,a+span,5),niceTicks(ylo,yhi,5)); ch.axes();
+      ch.axisX(niceTicks(a-span,a+span,5)); ch.axisY(niceTicks(ylo,yhi,5));
+      // epsilon band (horizontal)
+      const ctx=ch.ctx; ctx.fillStyle=hexA(COL.amber,.12); ctx.fillRect(ch.px0,ch.Y(L+e),ch.px1-ch.px0,ch.Y(L-e)-ch.Y(L+e));
+      // delta box (the green target)
+      ctx.fillStyle=hexA(COL.calc2,.16); ctx.fillRect(ch.X(a-dl),ch.Y(L+e),ch.X(a+dl)-ch.X(a-dl),ch.Y(L-e)-ch.Y(L+e));
+      ctx.strokeStyle=COL.calc2; ctx.lineWidth=2; ctx.strokeRect(ch.X(a-dl),ch.Y(L+e),ch.X(a+dl)-ch.X(a-dl),ch.Y(L-e)-ch.Y(L+e));
+      ch.line(a-span,L,a+span,L,hexA(COL.coral,.55),1.5,[5,4]);
+      ch.curve(f,COL.calc1,2.6); ch.dot(a,L,COL.coral,5);
+      // check: does f stay within ε across (a-δ,a+δ)?
+      let ok=true,worst=0; for(let i=0;i<=200;i++){ const x=a-dl+2*dl*i/200; if(Math.abs(x-a)<1e-9)continue; const dy=Math.abs(f(x)-L); if(dy>e)ok=false; worst=Math.max(worst,dy); }
+      verdict.innerHTML = ok
+        ? `<b style="color:${COL.calc2}">✓ Works.</b> Across the whole δ-window the curve stays within ε = ${e.toFixed(2)} of L = ${M.round(L,3)}. (largest deviation ${M.round(worst,3)})`
+        : `<b style="color:${COL.coral}">✗ Too wide.</b> The curve escapes the ε-band (deviation reaches ${M.round(worst,3)} > ${e.toFixed(2)}). Shrink δ.`;
+      verdict.style.borderLeftColor = ok?COL.calc2:COL.coral;
+    }
+    function autoDelta(){ const f=fin.fn(); if(!f)return; const a=aIn.get(),L=f(a),e=eps.get();
+      let d=2; while(d>0.02){ let ok=true; for(let i=0;i<=120;i++){ const x=a-d+2*d*i/120; if(Math.abs(x-a)<1e-9)continue; if(Math.abs(f(x)-L)>e){ok=false;break;} } if(ok)break; d-=0.02; }
+      del.set(Math.max(0.02,M.round(d,2))); render(); }
+    render();
+  }
+});
+
+/* ----- 4. Secant → Tangent (Ch 2.7 / 2.8) ----- */
+add({ id:'secant-tangent', cat:'calc1', tag:'interactive', title:'Secant → Tangent', diff:'intro', ch:'Ch 2.7',
+  questions:['As h shrinks toward 0, what number does the secant slope approach?','Is the difference quotient ever defined exactly at h = 0? Why use a limit?','How does the tangent slope relate to whether f is increasing or decreasing?'],
+  blurb:'Drag h toward 0 and watch the secant line through two points become the tangent line.',
+  build(host){
+    const fin=makeFnInput('Function f(x)','x^2',['x'],()=>render());
+    const x0=UI.slider({label:'base point a',min:-4,max:4,step:.1,value:1,fmt:v=>v.toFixed(1),oninput:render});
+    const h=UI.slider({label:'h (gap to second point)',min:-3,max:3,step:.02,value:2,fmt:v=>v.toFixed(2),oninput:render});
+    const anim=UI.buttons([{label:'Animate h → 0',primary:true,onclick:animate}]);
+    const stats=UI.statsBox(); const plot=UI.plotCard('Secant through (a, f(a)) and (a+h, f(a+h))',360);
+    host.appendChild(UI.appGrid([fin,x0,h,anim,stats,UI.note('The <b>difference quotient</b> [f(a+h) − f(a)] / h is the secant slope. As <b>h → 0</b> it converges to f′(a), the tangent slope. The numeric and limit values are compared live.')],[plot]));
+    function render(){
+      const f=fin.fn(); if(!f)return; const a=x0.get(), H=h.get()||1e-6;
+      const fa=f(a), fah=f(a+H); const sec=(fah-fa)/H; const deriv=M.nderiv(f,a);
+      stats.set([{k:'a',v:M.round(a,2)},{k:'h',v:M.round(H,3)},{k:'secant slope',v:M.round(sec,4),accent:1},{k:"f′(a) (tangent)",v:M.round(deriv,4),accent:1},{k:'difference',v:M.round(Math.abs(sec-deriv),4)}]);
+      const ch=plot.chart(); ch.setX(-6,6);
+      const ys=[]; for(let i=0;i<=60;i++){ const x=-6+12*i/60; const y=f(x); if(isFinite(y)&&Math.abs(y)<200)ys.push(y); }
+      let ylo=ys.length?M.min(ys):-6, yhi=ys.length?M.max(ys):6; const pad=(yhi-ylo)*.12||1; ch.setY(ylo-pad,yhi+pad); ch.clear();
+      ch.gridlines(niceTicks(-6,6,6),niceTicks(ylo-pad,yhi+pad,5)); ch.axes(); ch.axisX(niceTicks(-6,6,6)); ch.axisY(niceTicks(ylo-pad,yhi+pad,5));
+      ch.curve(f,COL.calc1,2.4);
+      // tangent (faint) + secant (bold)
+      ch.line(-6,deriv*(-6-a)+fa,6,deriv*(6-a)+fa,hexA(COL.calc2,.55),2,[6,4]);
+      ch.line(-6,sec*(-6-a)+fa,6,sec*(6-a)+fa,COL.coral,2.4);
+      ch.dot(a,fa,COL.ink,5); ch.dot(a+H,fah,COL.amber,5);
+    }
+    function animate(){ let H=h.get(); const sign=H>=0?1:-1; const step=()=>{ H*=0.86; if(Math.abs(H)<0.02)H=sign*0.02; h.set(M.round(H,2)); render(); if(Math.abs(H)>0.021)requestAnimationFrame(()=>setTimeout(step,40)); }; step(); }
+    render();
+  }
+});
+
+/* ----- 5. Derivative Grapher (Ch 2.8 / 3) ----- */
+add({ id:'derivative-grapher', cat:'calc1', tag:'explore', title:'Graph of the Derivative', diff:'inter', ch:'Ch 2.8',
+  questions:['Where f has a local max or min, what is the value of f′?','Where f′ is positive, is f rising or falling?','Where f′ has its own max/min, what is special about f there (inflection)?'],
+  blurb:'See f and its derivative f′ stacked together. Move the point to read slope as height.',
+  build(host){
+    const fin=makeFnInput('Function f(x)','x^3 - 3*x',['x'],()=>render());
+    const px=UI.slider({label:'point x',min:-4,max:4,step:.05,value:0.5,fmt:v=>v.toFixed(2),oninput:render});
+    const show2=UI.seg({label:'Also show f″ (concavity)',options:[{label:'Off',value:0},{label:'On',value:1}],value:0,onchange:render});
+    const stats=UI.statsBox();
+    const top=UI.plotCard('f(x) — original',230); const bot=UI.plotCard("f′(x) — derivative (slope of f above)",230);
+    host.appendChild(UI.appGrid([fin,px,show2,stats,UI.note('The bottom graph plots the <b>slope</b> of the top graph. Wherever f is flat (a peak or valley), f′ crosses zero. Wherever f′ is above the axis, f is increasing.')],[top,bot]));
+    function render(){
+      const f=fin.fn(); if(!f)return; const x=px.get();
+      const df=u=>M.nderiv(f,u), ddf=u=>M.nderiv2(f,u);
+      const fx=f(x),dfx=df(x),ddfx=ddf(x);
+      stats.set([{k:'x',v:M.round(x,2)},{k:'f(x)',v:M.round(fx,3)},{k:"f′(x) slope",v:M.round(dfx,3),accent:1},{k:'f″(x)',v:M.round(ddfx,3)},{k:'shape',v: dfx>0.02?'↗ rising':dfx<-0.02?'↘ falling':'→ flat'}]);
+      const XL=-5,XR=5;
+      // top
+      let ys=[]; for(let i=0;i<=80;i++){ const xx=XL+(XR-XL)*i/80,y=f(xx); if(isFinite(y)&&Math.abs(y)<200)ys.push(y);} let a=ys.length?M.min(ys):-5,bb=ys.length?M.max(ys):5; let p=(bb-a)*.12||1;
+      const ct=top.chart(); ct.setX(XL,XR).setY(a-p,bb+p); ct.clear(); ct.gridlines(niceTicks(XL,XR,6),niceTicks(a-p,bb+p,4)); ct.axes(); ct.axisX(niceTicks(XL,XR,6)); ct.axisY(niceTicks(a-p,bb+p,4));
+      ct.curve(f,COL.calc1,2.4); ct.line(x-1.4,fx-dfx*1.4,x+1.4,fx+dfx*1.4,COL.coral,2); ct.dot(x,fx,COL.ink,5);
+      // bottom
+      let dys=[]; for(let i=0;i<=80;i++){ const xx=XL+(XR-XL)*i/80,y=df(xx); if(isFinite(y)&&Math.abs(y)<200)dys.push(y);} let da=dys.length?M.min(dys):-5,db=dys.length?M.max(dys):5; let dp=(db-da)*.15||1;
+      const cb=bot.chart(); cb.setX(XL,XR).setY(da-dp,db+dp); cb.clear(); cb.gridlines(niceTicks(XL,XR,6),niceTicks(da-dp,db+dp,4)); cb.axes(); cb.axisX(niceTicks(XL,XR,6)); cb.axisY(niceTicks(da-dp,db+dp,4));
+      cb.curve(df,COL.calc2,2.4);
+      if(show2.get()=='1') cb.curve(ddf,hexA(COL.calc3,.7),1.8,200);
+      cb.dot(x,dfx,COL.coral,5); cb.line(XL,0,XR,0,hexA(COL.faint,.5),1,[3,3]);
+    }
+    render();
+  }
+});
+
+/* ----- 6. Riemann Sums (Ch 5.1 / 5.2) ----- */
+add({ id:'riemann-sums', cat:'calc1', tag:'interactive', title:'Riemann Sums', diff:'intro', ch:'Ch 5.1',
+  questions:['As n grows, do all four rules (left, right, midpoint, trapezoid) converge to the same value?','For an increasing function, which rule overestimates and which underestimates?','Which rule is most accurate for a given n, and why?'],
+  blurb:'Approximate area under a curve with rectangles. Choose the rule and slide n toward the exact integral.',
+  build(host){
+    const fin=makeFnInput('Function f(x)','x^2',['x'],()=>render());
+    const ab=UI.text({label:'Interval [a, b]',value:'0, 3',hint:'two numbers, e.g. 0, 3',onchange:render});
+    const n=UI.slider({label:'number of subintervals n',min:1,max:120,value:8,fmt:v=>v,oninput:render});
+    const rule=UI.seg({label:'rule',options:[{label:'Left',value:'left'},{label:'Right',value:'right'},{label:'Mid',value:'mid'},{label:'Trap',value:'trap'}],value:'mid',onchange:render});
+    const stats=UI.statsBox(); const plot=UI.plotCard('Riemann approximation',360);
+    host.appendChild(UI.appGrid([fin,ab,n,rule,stats,UI.note('The <b>signed area</b> of the rectangles estimates ∫f dx. As <b>n → ∞</b> the estimate converges to the exact definite integral (computed here by high-precision Simpson\u2019s rule for comparison).')],[plot]));
+    function render(){
+      const f=fin.fn(); if(!f)return; const parts=parseAB(ab.get()); if(!parts)return; let[a,b]=parts; if(b<a)[a,b]=[b,a];
+      const N=n.get(), mode=rule.get();
+      const approx=M.riemann(f,a,b,N,mode), exact=M.integrate(f,a,b,800);
+      stats.set([{k:'n',v:N},{k:'rule',v:mode},{k:'approx',v:M.round(approx,4),accent:1},{k:'exact ∫',v:M.round(exact,4),accent:1},{k:'error',v:M.round(Math.abs(approx-exact),4)}]);
+      const pad=(b-a)*0.08; const ch=plot.chart(); ch.setX(a-pad,b+pad);
+      let ys=[]; for(let i=0;i<=100;i++){ const x=a+(b-a)*i/100,y=f(x); if(isFinite(y))ys.push(y);} let ylo=Math.min(0,M.min(ys)),yhi=Math.max(0,M.max(ys)); let p=(yhi-ylo)*.12||1; ch.setY(ylo-p,yhi+p); ch.clear();
+      ch.gridlines(niceTicks(a-pad,b+pad,6),niceTicks(ylo-p,yhi+p,5)); ch.axes();
+      // rectangles
+      const ctx=ch.ctx, h=(b-a)/N;
+      for(let i=0;i<N;i++){ const xl=a+i*h, xr=xl+h;
+        let height,xs;
+        if(mode==='left'){ height=f(xl); }
+        else if(mode==='right'){ height=f(xr); }
+        else if(mode==='mid'){ height=f((xl+xr)/2); }
+        else { // trapezoid
+          ctx.fillStyle=hexA(COL.calc1,.18); ctx.strokeStyle=hexA(COL.calc1,.7); ctx.lineWidth=1;
+          ctx.beginPath(); ctx.moveTo(ch.X(xl),ch.Y(0)); ctx.lineTo(ch.X(xl),ch.Y(f(xl))); ctx.lineTo(ch.X(xr),ch.Y(f(xr))); ctx.lineTo(ch.X(xr),ch.Y(0)); ctx.closePath(); ctx.fill(); ctx.stroke(); continue;
+        }
+        ctx.fillStyle=hexA(COL.calc1,.18); ctx.fillRect(ch.X(xl),ch.Y(Math.max(0,height)),ch.X(xr)-ch.X(xl),Math.abs(ch.Y(height)-ch.Y(0)));
+        ctx.strokeStyle=hexA(COL.calc1,.7); ctx.lineWidth=1; ctx.strokeRect(ch.X(xl),ch.Y(Math.max(0,height)),ch.X(xr)-ch.X(xl),Math.abs(ch.Y(height)-ch.Y(0)));
+      }
+      ch.curve(f,COL.coral,2.6); ch.axisX(niceTicks(a-pad,b+pad,6)); ch.axisY(niceTicks(ylo-p,yhi+p,5));
+      ch.marker(a,'a',COL.calc2); ch.marker(b,'b',COL.calc2);
+    }
+    render();
+  }
+});
+function parseAB(s){ const p=(s||'').split(/[\s,]+/).map(Number).filter(x=>!isNaN(x)); return p.length>=2?[p[0],p[1]]:null; }
+/* =====================================================================
+   CALCULUS II  (Chapters 6, 7, 8, 10, 11)
+   ===================================================================== */
+
+/* ----- 7. Area Between Curves (Ch 6.1) ----- */
+add({ id:'area-between', cat:'calc2', tag:'interactive', title:'Area Between Curves', diff:'intro', ch:'Ch 6.1',
+  questions:['Which function is "on top" matters — what happens to the area if you swap them?','How do you handle a region where the curves cross inside [a, b]?','Why is the integrand always (top − bottom), never the other way?'],
+  blurb:'Pick two curves and an interval; the region between them is shaded and its area computed.',
+  build(host){
+    const ftop=makeFnInput('upper curve f(x)','sqrt(x)',['x'],()=>render());
+    const fbot=makeFnInput('lower curve g(x)','x^2',['x'],()=>render());
+    const ab=UI.text({label:'Interval [a, b]',value:'0, 1',hint:'two numbers',onchange:render});
+    const findX=UI.buttons([{label:'Snap to intersection points',onclick:snap}]);
+    const stats=UI.statsBox(); const plot=UI.plotCard('Region between f and g',360);
+    host.appendChild(UI.appGrid([ftop,fbot,ab,findX,stats,UI.note('Area = ∫ₐᵇ |f(x) − g(x)| dx. The shaded band is the region. If the curves intersect, "Snap" finds those crossings to use as natural limits.')],[plot]));
+    function render(){
+      const f=ftop.fn(),g=fbot.fn(); if(!f||!g)return; const parts=parseAB(ab.get()); if(!parts)return; let[a,b]=parts; if(b<a)[a,b]=[b,a];
+      const area=M.integrate(x=>Math.abs(f(x)-g(x)),a,b,800);
+      stats.set([{k:'a',v:M.round(a,3)},{k:'b',v:M.round(b,3)},{k:'∫|f−g| dx',v:M.round(area,4),accent:1}]);
+      const pad=(b-a)*0.12||.5; const ch=plot.chart(); ch.setX(a-pad,b+pad);
+      let ys=[]; for(let i=0;i<=100;i++){ const x=a-pad+(b-a+2*pad)*i/100; [f(x),g(x)].forEach(y=>{if(isFinite(y)&&Math.abs(y)<200)ys.push(y);}); }
+      let ylo=M.min(ys),yhi=M.max(ys); let p=(yhi-ylo)*.12||1; ch.setY(ylo-p,yhi+p); ch.clear();
+      ch.gridlines(niceTicks(a-pad,b+pad,6),niceTicks(ylo-p,yhi+p,5)); ch.axes();
+      ch.shade(x=>f(x),a,b,hexA(COL.calc2,.20),160,x=>g(x));
+      ch.curve(f,COL.calc1,2.4); ch.curve(g,COL.calc3,2.4);
+      ch.axisX(niceTicks(a-pad,b+pad,6)); ch.axisY(niceTicks(ylo-p,yhi+p,5));
+      ch.marker(a,'a',COL.coral); ch.marker(b,'b',COL.coral);
+    }
+    function snap(){ const f=ftop.fn(),g=fbot.fn(); if(!f||!g)return; const d=x=>f(x)-g(x); const roots=[];
+      let prev=d(-10); for(let x=-10;x<=10;x+=0.05){ const cur=d(x); if(isFinite(prev)&&isFinite(cur)&&prev*cur<0){ let lo=x-0.05,hi=x; for(let k=0;k<40;k++){ const mid=(lo+hi)/2; (d(lo)*d(mid)<0)?hi=mid:lo=mid; } roots.push(M.round((lo+hi)/2,3)); } prev=cur; }
+      if(roots.length>=2){ ab.set(`${roots[0]}, ${roots[roots.length-1]}`); render(); }
+      else { ab.input&&(ab.input.style.borderColor=COL.amber); }
+    }
+    render();
+  }
+});
+
+/* ----- 8. Solids of Revolution (Ch 6.2 / 6.3) ----- */
+add({ id:'solids-revolution', cat:'calc2', tag:'interactive', title:'Solids of Revolution', diff:'inter', ch:'Ch 6.2',
+  questions:['Why does the disk method square the radius? Where does π r² come from?','When is the shell method easier than the disk/washer method?','How does rotating about y = c instead of the x-axis change the radius?'],
+  blurb:'Rotate a region around the x-axis and see the disks (or shells) that build the solid\u2019s volume.',
+  build(host){
+    const fin=makeFnInput('curve f(x)  (radius)','sqrt(x)',['x'],()=>render());
+    const ab=UI.text({label:'Interval [a, b]',value:'0, 4',hint:'two numbers',onchange:render});
+    const method=UI.seg({label:'method',options:[{label:'Disks',value:'disk'},{label:'Shells',value:'shell'}],value:'disk',onchange:render});
+    const n=UI.slider({label:'number of slices n',min:2,max:60,value:14,fmt:v=>v,oninput:render});
+    const stats=UI.statsBox();
+    const top=UI.plotCard('Region (rotated about x-axis)',200); const bot=UI.plotCard('Solid — cross-sectional slices',230);
+    host.appendChild(UI.appGrid([fin,ab,method,n,stats,UI.note('<b>Disk method:</b> V = ∫ π[f(x)]² dx — stack thin circular disks perpendicular to the axis. <b>Shell method:</b> V = ∫ 2π x f(x) dx — nest thin cylindrical shells. Both give the same volume.')],[top,bot]));
+    function render(){
+      const f=fin.fn(); if(!f)return; const parts=parseAB(ab.get()); if(!parts)return; let[a,b]=parts; if(b<a)[a,b]=[b,a];
+      const meth=method.get(), N=n.get();
+      const Vdisk=M.integrate(x=>Math.PI*f(x)*f(x),a,b,800);
+      const Vshell=M.integrate(x=>2*Math.PI*Math.abs(x)*f(x),a,b,800);
+      stats.set([{k:'method',v:meth},{k:'V (disks)',v:M.round(Vdisk,3),accent:meth==='disk'?1:0},{k:'V (shells)',v:M.round(Vshell,3),accent:meth==='shell'?1:0},{k:'n',v:N}]);
+      const pad=(b-a)*0.08; const XL=a-pad,XR=b+pad;
+      let ys=[]; for(let i=0;i<=80;i++){ const x=a+(b-a)*i/80,y=f(x); if(isFinite(y))ys.push(y);} const ymax=M.max(ys.map(Math.abs))||1;
+      // top: region + reflection
+      const ct=top.chart(); ct.setX(XL,XR).setY(-ymax*1.25,ymax*1.25); ct.clear(); ct.gridlines(niceTicks(XL,XR,6),null); ct.axes(); ct.axisX(niceTicks(XL,XR,6));
+      ct.shade(x=>f(x),a,b,hexA(COL.calc2,.18)); ct.shade(x=>-f(x),a,b,hexA(COL.calc2,.10));
+      ct.curve(f,COL.calc1,2.2); ct.curve(x=>-f(x),hexA(COL.calc1,.4),1.5); ct.line(XL,0,XR,0,COL.faint,1.4);
+      // bottom: schematic slices
+      const cb=bot.chart(); cb.setX(XL,XR).setY(-ymax*1.25,ymax*1.25); cb.clear(); cb.axes(); cb.line(XL,0,XR,0,COL.faint,1.4); cb.axisX(niceTicks(XL,XR,6));
+      const ctx=cb.ctx, h=(b-a)/N;
+      if(meth==='disk'){
+        for(let i=0;i<N;i++){ const xc=a+(i+0.5)*h, r=Math.abs(f(xc)); if(!isFinite(r))continue;
+          ctx.fillStyle=hexA(COL.calc2,.16); ctx.strokeStyle=hexA(COL.calc2,.7); ctx.lineWidth=1;
+          const w=cb.X(a+(i+1)*h)-cb.X(a+i*h);
+          ctx.beginPath(); ctx.ellipse(cb.X(xc),cb.Y(0),Math.max(1,w*0.42),Math.abs(cb.Y(r)-cb.Y(0)),0,0,M.TAU); ctx.fill(); ctx.stroke();
+        }
+      } else {
+        for(let i=0;i<N;i++){ const xc=a+(i+0.5)*h, r=Math.abs(f(xc)); if(!isFinite(r))continue;
+          ctx.strokeStyle=hexA(COL.calc3,.6); ctx.lineWidth=1.4;
+          ctx.beginPath(); ctx.moveTo(cb.X(xc),cb.Y(r)); ctx.lineTo(cb.X(xc),cb.Y(-r)); ctx.stroke();
+          ctx.beginPath(); ctx.moveTo(cb.X(2*((a+b)/2)-xc),cb.Y(r)); ctx.lineTo(cb.X(2*((a+b)/2)-xc),cb.Y(-r)); ctx.stroke();
+        }
+      }
+      cb.curve(f,hexA(COL.calc1,.5),1.6); cb.curve(x=>-f(x),hexA(COL.calc1,.5),1.6);
+    }
+    render();
+  }
+});
+
+/* ----- 9. Arc Length & Surface Area (Ch 8.1 / 8.2) ----- */
+add({ id:'arc-length', cat:'calc2', tag:'explore', title:'Arc Length & Surface Area', diff:'inter', ch:'Ch 8.1',
+  questions:['Why does the arc-length integrand contain √(1 + [f′]²)?','How does the straight-line polygonal estimate compare to the true curve length?','For a surface of revolution, why does the radius f(x) multiply the arc-length element?'],
+  blurb:'Measure the true length of a curve by summing tiny straight segments — and the surface it sweeps.',
+  build(host){
+    const fin=makeFnInput('curve f(x)','sin(x)',['x'],()=>render());
+    const ab=UI.text({label:'Interval [a, b]',value:'0, 3.14159',hint:'two numbers',onchange:render});
+    const n=UI.slider({label:'polygonal segments n',min:1,max:60,value:6,fmt:v=>v,oninput:render});
+    const surf=UI.seg({label:'show surface of revolution area',options:[{label:'Off',value:0},{label:'On',value:1}],value:0,onchange:render});
+    const stats=UI.statsBox(); const plot=UI.plotCard('Curve with polygonal approximation',360);
+    host.appendChild(UI.appGrid([fin,ab,n,surf,stats,UI.note('Exact arc length L = ∫ₐᵇ √(1 + [f′(x)]²) dx. The dashed polygon connects n points on the curve; its total length climbs toward L as n grows. Surface area (about x-axis) = ∫ 2π|f| √(1+[f′]²) dx.')],[plot]));
+    function render(){
+      const f=fin.fn(); if(!f)return; const parts=parseAB(ab.get()); if(!parts)return; let[a,b]=parts; if(b<a)[a,b]=[b,a];
+      const N=n.get();
+      const Lexact=M.integrate(x=>{ const d=M.nderiv(f,x); return Math.sqrt(1+d*d); },a,b,800);
+      let Lpoly=0; const px=[],py=[]; for(let i=0;i<=N;i++){ const x=a+(b-a)*i/N,y=f(x); px.push(x);py.push(y); if(i>0)Lpoly+=Math.hypot(px[i]-px[i-1],py[i]-py[i-1]); }
+      const Sarea=M.integrate(x=>{ const d=M.nderiv(f,x); return 2*Math.PI*Math.abs(f(x))*Math.sqrt(1+d*d); },a,b,800);
+      const st=[{k:'n',v:N},{k:'polygon length',v:M.round(Lpoly,4),accent:1},{k:'exact L',v:M.round(Lexact,4),accent:1},{k:'error',v:M.round(Math.abs(Lpoly-Lexact),4)}];
+      if(surf.get()=='1') st.push({k:'surface area',v:M.round(Sarea,3)});
+      stats.set(st);
+      const pad=(b-a)*0.08; const ch=plot.chart(); ch.setX(a-pad,b+pad);
+      let ys=[]; for(let i=0;i<=80;i++){ const x=a+(b-a)*i/80,y=f(x); if(isFinite(y))ys.push(y);} let ylo=M.min(ys),yhi=M.max(ys); let p=(yhi-ylo)*.18||1; ch.setY(ylo-p,yhi+p); ch.clear();
+      ch.gridlines(niceTicks(a-pad,b+pad,6),niceTicks(ylo-p,yhi+p,5)); ch.axes(); ch.axisX(niceTicks(a-pad,b+pad,6)); ch.axisY(niceTicks(ylo-p,yhi+p,5));
+      ch.curve(f,COL.calc1,2.2);
+      ch.pline(px.map(x=>ch.X(x)),py.map(y=>ch.Y(y)),COL.coral,2,[5,4]);
+      px.forEach((x,i)=>ch.dot(x,py[i],COL.amber,3.5));
+    }
+    render();
+  }
+});
+
+/* ----- 10. Taylor / Maclaurin Series (Ch 11.10 / 11.11) ----- */
+add({ id:'taylor-series', cat:'calc2', tag:'interactive', title:'Taylor Series Builder', diff:'inter', ch:'Ch 11.10',
+  questions:['How does adding more terms change where the approximation is accurate?','Why is the approximation best near the center point a and worse far away?','What is the radius of convergence — where does adding terms stop helping?'],
+  blurb:'Add Taylor polynomial terms one at a time and watch the approximation hug the true function.',
+  build(host){
+    const fns={ 'e^x':{f:Math.exp,c:n=>1/M.factorial(n)}, 'sin(x)':{f:Math.sin}, 'cos(x)':{f:Math.cos}, 'ln(1+x)':{f:x=>Math.log(1+x)}, '1/(1-x)':{f:x=>1/(1-x)} };
+    let key='sin(x)';
+    const sel=UI.select({label:'function',options:Object.keys(fns).map(k=>({label:k,value:k})),value:key,onchange:v=>{key=v;render();}});
+    const center=UI.slider({label:'center a',min:-3,max:3,step:.5,value:0,fmt:v=>v.toFixed(1),oninput:render});
+    const order=UI.slider({label:'polynomial degree n',min:0,max:14,value:3,fmt:v=>v,oninput:render});
+    const stats=UI.statsBox(); const plot=UI.plotCard('f(x) vs. Taylor polynomial Tₙ(x)',360);
+    host.appendChild(UI.appGrid([sel,center,order,stats,UI.note('The Taylor polynomial Tₙ matches f and its first n derivatives at the center <b>a</b>. The coefficients come from f⁽ᵏ⁾(a)/k!. Watch how raising the degree extends the interval where Tₙ tracks f.')],[plot]));
+    function taylorCoeffs(f,a,n){ // numerical derivatives via finite differences
+      const co=[]; for(let k=0;k<=n;k++){ co.push(nthDeriv(f,a,k)/M.factorial(k)); } return co; }
+    function nthDeriv(f,x,k,h=0.05){ if(k===0)return f(x); // central finite difference of order k
+      let s=0; for(let i=0;i<=k;i++){ s+=(-1)**i*binom(k,i)*f(x+(k/2-i)*h); } return s/Math.pow(h,k); }
+    function binom(n,k){ return M.factorial(n)/(M.factorial(k)*M.factorial(n-k)); }
+    function render(){
+      const f=fns[key].f, a=center.get(), n=order.get();
+      const co=taylorCoeffs(f,a,n);
+      const T=x=>{ let s=0; for(let k=0;k<=n;k++)s+=co[k]*Math.pow(x-a,k); return s; };
+      const testX=a+1.5; stats.set([{k:'degree',v:n},{k:'center a',v:a},{k:`f(${M.round(testX,1)})`,v:M.round(f(testX),4),accent:1},{k:`Tₙ(${M.round(testX,1)})`,v:M.round(T(testX),4),accent:1},{k:'error there',v:M.round(Math.abs(f(testX)-T(testX)),4)}]);
+      const XL=-6,XR=6; const ch=plot.chart(); ch.setX(XL,XR).setY(-4,4); ch.clear();
+      ch.gridlines(niceTicks(XL,XR,6),niceTicks(-4,4,5)); ch.axes(); ch.axisX(niceTicks(XL,XR,6)); ch.axisY(niceTicks(-4,4,5));
+      ch.curve(f,COL.calc1,2.6);
+      ch.curve(T,COL.coral,2.4);
+      ch.dot(a,f(a),COL.calc2,5); ch.marker(a,'a',COL.calc2);
+    }
+    render();
+  }
+});
+
+/* ----- 11. Series Convergence (Ch 11.2 – 11.6) ----- */
+add({ id:'series-convergence', cat:'calc2', tag:'explore', title:'Series & Convergence', diff:'inter', ch:'Ch 11.3',
+  questions:['Do the partial sums settle toward a horizontal line (converge) or wander off?','The harmonic series Σ1/n diverges but Σ1/n² converges — can you see the difference?','What does the ratio test value L tell you about convergence?'],
+  blurb:'Watch partial sums of a series accumulate and apply the ratio test to judge convergence.',
+  build(host){
+    const presets={ '1/n  (harmonic)':n=>1/n, '1/n^2  (p=2)':n=>1/(n*n), '1/2^n  (geometric)':n=>1/Math.pow(2,n), '(-1)^n/n  (alternating)':n=>Math.pow(-1,n)/n, 'n/2^n':n=>n/Math.pow(2,n), '1/sqrt(n)':n=>1/Math.sqrt(n) };
+    let key='1/n^2  (p=2)';
+    const sel=UI.select({label:'term aₙ (n ≥ 1)',options:Object.keys(presets).map(k=>({label:k,value:k})),value:key,onchange:v=>{key=v;render();}});
+    const N=UI.slider({label:'number of terms',min:5,max:200,value:40,fmt:v=>v,oninput:render});
+    const stats=UI.statsBox(); const plot=UI.plotCard('Partial sums Sₙ = Σ aₖ',360);
+    host.appendChild(UI.appGrid([sel,N,stats,UI.note('A series Σaₙ <b>converges</b> if its partial sums approach a finite limit. The <b>ratio test</b> looks at L = lim |aₙ₊₁/aₙ|: L < 1 → converges, L > 1 → diverges, L = 1 → inconclusive.')],[plot]));
+    function render(){
+      const a=presets[key], n=N.get(); const partial=[]; let s=0;
+      for(let k=1;k<=n;k++){ s+=a(k); partial.push(s); }
+      const ratio=Math.abs(a(n+1)/a(n));
+      const lastFew=partial.slice(-8); const spread=M.max(lastFew)-M.min(lastFew);
+      const verdict = spread<0.01? 'converging' : (Math.abs(partial[n-1])>Math.abs(partial[Math.floor(n/2)])*1.5?'growing':'slow');
+      stats.set([{k:'terms',v:n},{k:'partial sum Sₙ',v:M.round(partial[n-1],5),accent:1},{k:'last term aₙ',v:M.round(a(n),6)},{k:'ratio |aₙ₊₁/aₙ|',v:M.round(ratio,4),accent:1},{k:'trend',v:verdict}]);
+      const ch=plot.chart(); ch.setX(0,n+1);
+      let ylo=Math.min(0,M.min(partial)),yhi=M.max(partial); let p=(yhi-ylo)*.12||1; ch.setY(ylo-p,yhi+p); ch.clear();
+      ch.gridlines(niceTicks(0,n+1,6),niceTicks(ylo-p,yhi+p,5)); ch.axes(); ch.axisX(niceTicks(0,n+1,6)); ch.axisY(niceTicks(ylo-p,yhi+p,5));
+      // partial sum points/line
+      const xs=partial.map((_,i)=>i+1);
+      ch.pline(xs.map(x=>ch.X(x)),partial.map(y=>ch.Y(y)),COL.calc2,2.2);
+      ch.points(xs,partial,hexA(COL.calc1,.7),2.5);
+      if(spread<0.05){ ch.line(0,partial[n-1],n+1,partial[n-1],hexA(COL.coral,.6),1.5,[5,4]); }
+    }
+    render();
+  }
+});
+
+/* ----- 12. Polar Curves (Ch 10.3 / 10.4) ----- */
+add({ id:'polar-curves', cat:'calc2', tag:'explore', title:'Polar Curve Explorer', diff:'inter', ch:'Ch 10.3',
+  questions:['How does the number of petals in r = cos(kθ) depend on whether k is even or odd?','What θ-range traces the full curve exactly once?','How is the polar area ½∫r² dθ different from a Cartesian area?'],
+  blurb:'Trace r = f(θ) in the plane — roses, cardioids, spirals — and compute the enclosed area.',
+  build(host){
+    const fin=makeFnInput('r(θ)','2*cos(3*t)',['t'],()=>render(),'use t for θ; e.g. 1+sin(t), 2*cos(3*t), t/2');
+    const range=UI.text({label:'θ from … to … (×π)',value:'0, 2',hint:'in multiples of π, e.g. 0, 2',onchange:render});
+    const trace=UI.slider({label:'trace up to θ',min:0,max:100,value:100,fmt:v=>v+'%',oninput:render});
+    const stats=UI.statsBox(); const plot=UI.plotCard('Polar curve r = f(θ)',380);
+    host.appendChild(UI.appGrid([fin,range,trace,stats,UI.note('Each θ gives a radius r; the point sits at (r cosθ, r sinθ). The <b>enclosed area</b> swept is ½∫r² dθ. Try r = 1 + cos(t) for a cardioid, or r = 2cos(3t) for a three-petal rose.')],[plot]));
+    function render(){
+      const f=fin.fn(); if(!f)return; const parts=parseAB(range.get()); if(!parts)return; let[t0,t1]=parts; t0*=Math.PI; t1*=Math.PI;
+      const frac=trace.get()/100; const tEnd=t0+(t1-t0)*frac;
+      const area=0.5*M.integrate(t=>{ const r=f(t); return r*r; },t0,t1,1000);
+      const xs=[],ys=[]; let rmax=0; const Mn=600;
+      for(let i=0;i<=Mn;i++){ const t=t0+(t1-t0)*i/Mn; const r=f(t); if(!isFinite(r))continue; rmax=Math.max(rmax,Math.abs(r)); }
+      rmax=rmax||1; const lim=rmax*1.15;
+      stats.set([{k:'θ end',v:M.round(tEnd,2)},{k:'r at θ_end',v:M.round(f(tEnd),3),accent:1},{k:'max |r|',v:M.round(rmax,3)},{k:'½∫r²dθ (full)',v:M.round(area,4),accent:1}]);
+      const ch=plot.chart({m:{t:14,r:14,b:14,l:14}}); ch.setX(-lim,lim).setY(-lim,lim); ch.clear();
+      ch.gridlines(niceTicks(-lim,lim,6),niceTicks(-lim,lim,6)); ch.axes();
+      // traced part
+      const tx=[],ty=[]; const steps=Math.max(2,Math.round(Mn*frac));
+      for(let i=0;i<=steps;i++){ const t=t0+(tEnd-t0)*i/steps; const r=f(t); if(!isFinite(r))continue; tx.push(ch.X(r*Math.cos(t))); ty.push(ch.Y(r*Math.sin(t))); }
+      ch.pline(tx,ty,COL.calc2,2.4);
+      const rE=f(tEnd); if(isFinite(rE)) ch.dot(rE*Math.cos(tEnd),rE*Math.sin(tEnd),COL.coral,5);
+    }
+    render();
+  }
+});
+/* =====================================================================
+   CALCULUS III  (Chapters 12–15)
+   ===================================================================== */
+
+/* shared: simple contour-plot renderer for g(x,y) on a Chart */
+function drawContours(ch,g,levels,color,alpha=0.6){
+  const ctx=ch.ctx; const NX=70,NY=70; const xs=[],ys=[];
+  for(let i=0;i<=NX;i++)xs.push(ch.xmin+(ch.xmax-ch.xmin)*i/NX);
+  for(let j=0;j<=NY;j++)ys.push(ch.ymin+(ch.ymax-ch.ymin)*j/NY);
+  const Z=ys.map(y=>xs.map(x=>g(x,y)));
+  levels.forEach((lev,li)=>{
+    ctx.strokeStyle=hexA(color,alpha); ctx.lineWidth=1.2; ctx.beginPath();
+    for(let j=0;j<NY;j++) for(let i=0;i<NX;i++){
+      const a=Z[j][i],b=Z[j][i+1],c=Z[j+1][i+1],d=Z[j+1][i];
+      const cell=[[xs[i],ys[j],a],[xs[i+1],ys[j],b],[xs[i+1],ys[j+1],c],[xs[i],ys[j+1],d]];
+      for(let e=0;e<4;e++){ const p1=cell[e],p2=cell[(e+1)%4];
+        if((p1[2]-lev)*(p2[2]-lev)<0){ const t=(lev-p1[2])/(p2[2]-p1[2]); const X=p1[0]+t*(p2[0]-p1[0]),Y=p1[1]+t*(p2[1]-p1[1]); ctx.moveTo(ch.X(X),ch.Y(Y)); ctx.lineTo(ch.X(X),ch.Y(Y)+0.5); ctx.lineTo(ch.X(X)+0.5,ch.Y(Y)); } }
+    }
+    ctx.stroke();
+  });
+}
+
+/* ----- 13. 3D Vectors: Dot & Cross (Ch 12.3 / 12.4) ----- */
+add({ id:'vector-3d', cat:'calc3', tag:'interactive', title:'3D Vectors — Dot & Cross', diff:'inter', ch:'Ch 12.3',
+  questions:['When is the dot product zero? What does that say about the two vectors?','The cross product a × b is perpendicular to both — can you see it stand up out of their plane?','How does the parallelogram area relate to |a × b|?'],
+  blurb:'Set two vectors in 3D, drag to rotate the view, and see their dot product, cross product, and angle.',
+  build(host){
+    let a=[2,1,0], b=[1,2,1]; let yaw=-0.6, pitch=0.5;
+    const ax=UI.slider({label:'a · x',min:-4,max:4,step:.5,value:a[0],fmt:v=>v,oninput:v=>{a[0]=v;render();}});
+    const ay=UI.slider({label:'a · y',min:-4,max:4,step:.5,value:a[1],fmt:v=>v,oninput:v=>{a[1]=v;render();}});
+    const az=UI.slider({label:'a · z',min:-4,max:4,step:.5,value:a[2],fmt:v=>v,oninput:v=>{a[2]=v;render();}});
+    const bx=UI.slider({label:'b · x',min:-4,max:4,step:.5,value:b[0],fmt:v=>v,oninput:v=>{b[0]=v;render();}});
+    const by=UI.slider({label:'b · y',min:-4,max:4,step:.5,value:b[1],fmt:v=>v,oninput:v=>{b[1]=v;render();}});
+    const bz=UI.slider({label:'b · z',min:-4,max:4,step:.5,value:b[2],fmt:v=>v,oninput:v=>{b[2]=v;render();}});
+    const showCross=UI.seg({label:'show a × b and parallelogram',options:[{label:'Off',value:0},{label:'On',value:1}],value:1,onchange:render});
+    const stats=UI.statsBox(); const plot=UI.plotCard('drag to rotate · a (blue), b (violet), a×b (coral)',380);
+    host.appendChild(UI.appGrid([ax,ay,az,bx,by,bz,showCross,stats,UI.note('<b>Dot:</b> a·b = |a||b|cosθ — zero means perpendicular. <b>Cross:</b> a×b is perpendicular to both, with length equal to the parallelogram area |a||b|sinθ. Drag the plot to rotate.')],[plot]));
+    function proj(v){ // rotate by yaw (around z) then pitch (around x), then orthographic
+      const cy=Math.cos(yaw),sy=Math.sin(yaw); let x=v[0]*cy-v[1]*sy, y=v[0]*sy+v[1]*cy, z=v[2];
+      const cp=Math.cos(pitch),sp=Math.sin(pitch); let y2=y*cp-z*sp, z2=y*sp+z*cp;
+      return [x, z2]; // screen x = x ; screen y = elevated z
+    }
+    const cv=plot.canvas; let drag=false,lx,ly;
+    cv.style.cursor='grab';
+    cv.addEventListener('pointerdown',e=>{drag=true;lx=e.clientX;ly=e.clientY;cv.style.cursor='grabbing';cv.setPointerCapture(e.pointerId);});
+    cv.addEventListener('pointermove',e=>{ if(!drag)return; yaw+=(e.clientX-lx)*0.01; pitch=M.clamp(pitch-(e.clientY-ly)*0.01,-1.4,1.4); lx=e.clientX;ly=e.clientY; render(); });
+    cv.addEventListener('pointerup',e=>{drag=false;cv.style.cursor='grab';});
+    function render(){
+      const cr=M.cross(a,b), dt=M.dot(a,b), la=M.vlen(a),lb=M.vlen(b),lc=M.vlen(cr);
+      const ang=(la&&lb)?Math.acos(M.clamp(dt/(la*lb),-1,1))*180/Math.PI:0;
+      stats.set([{k:'a·b',v:M.round(dt,2),accent:1},{k:'angle θ',v:M.round(ang,1)+'°',accent:1},{k:'a×b',v:`(${M.round(cr[0],1)}, ${M.round(cr[1],1)}, ${M.round(cr[2],1)})`},{k:'|a×b| = area',v:M.round(lc,2),accent:1},{k:'|a|',v:M.round(la,2)},{k:'|b|',v:M.round(lb,2)}]);
+      const lim=5; const ch=plot.chart({m:{t:10,r:10,b:10,l:10}}); ch.setX(-lim,lim).setY(-lim,lim); ch.clear();
+      const ctx=ch.ctx;
+      // axes
+      const O=proj([0,0,0]);
+      [[ [4,0,0],'x',COL.slate],[ [0,4,0],'y',COL.slate],[ [0,0,4],'z',COL.slate]].forEach(([p,lbl,col])=>{
+        const P=proj(p); ctx.strokeStyle=hexA(col,.4); ctx.lineWidth=1; ctx.beginPath(); ctx.moveTo(ch.X(O[0]),ch.Y(O[1])); ctx.lineTo(ch.X(P[0]),ch.Y(P[1])); ctx.stroke();
+        ctx.fillStyle=hexA(col,.7); ctx.font='11px "JetBrains Mono",monospace'; ctx.fillText(lbl,ch.X(P[0])+3,ch.Y(P[1]));
+      });
+      function vec(v,col,w=2.6){ const P=proj(v); ch.arrow(O[0],O[1],P[0],P[1],col,w); }
+      if(showCross.get()=='1'){
+        // parallelogram
+        const p0=proj([0,0,0]),pa=proj(a),pb=proj(b),pab=proj(M.vadd(a,b));
+        ctx.fillStyle=hexA(COL.calc2,.14); ctx.beginPath(); ctx.moveTo(ch.X(p0[0]),ch.Y(p0[1])); ctx.lineTo(ch.X(pa[0]),ch.Y(pa[1])); ctx.lineTo(ch.X(pab[0]),ch.Y(pab[1])); ctx.lineTo(ch.X(pb[0]),ch.Y(pb[1])); ctx.closePath(); ctx.fill();
+        vec(cr.map(x=>x*0.6),COL.coral,2.6);
+      }
+      vec(a,COL.calc1); vec(b,COL.calc3);
+    }
+    render();
+  }
+});
+
+/* ----- 14. Partial Derivatives (Ch 14.3) ----- */
+add({ id:'partial-derivatives', cat:'calc3', tag:'explore', title:'Partial Derivatives', diff:'inter', ch:'Ch 14.3',
+  questions:['∂f/∂x is the slope of which slice — the one holding y fixed or x fixed?','At a point, can ∂f/∂x be positive while ∂f/∂y is negative?','Where both partials are zero, what kind of point might you have?'],
+  blurb:'Slice a surface z = f(x,y) along x and along y to see the two partial-derivative slopes.',
+  build(host){
+    const fin=makeFnInput('surface f(x, y)','x^2 - y^2',['x','y'],()=>render(),'use x and y; e.g. x^2+y^2, sin(x)*cos(y)');
+    const px=UI.slider({label:'point x',min:-3,max:3,step:.1,value:1,fmt:v=>v.toFixed(1),oninput:render});
+    const py=UI.slider({label:'point y',min:-3,max:3,step:.1,value:.5,fmt:v=>v.toFixed(1),oninput:render});
+    const stats=UI.statsBox();
+    const cont=UI.plotCard('Contour map of f(x,y) with the point',230);
+    const sx=UI.plotCard('Slice along x (y fixed) → slope is ∂f/∂x',150);
+    const sy=UI.plotCard('Slice along y (x fixed) → slope is ∂f/∂y',150);
+    host.appendChild(UI.appGrid([fin,px,py,stats,UI.note('A <b>partial derivative</b> ∂f/∂x is the ordinary derivative of the single-variable slice you get by freezing y. The two slice plots show exactly those cross-sections, and the red tangent line is the partial slope.')],[cont,sx,sy]));
+    function render(){
+      const f=fin.fn(); if(!f)return; const x0=px.get(),y0=py.get();
+      const g=(x,y)=>f(x,y);
+      const fx=(g(x0+1e-4,y0)-g(x0-1e-4,y0))/2e-4, fy=(g(x0,y0+1e-4)-g(x0,y0-1e-4))/2e-4;
+      stats.set([{k:'f(x,y)',v:M.round(g(x0,y0),3)},{k:'∂f/∂x',v:M.round(fx,3),accent:1},{k:'∂f/∂y',v:M.round(fy,3),accent:1},{k:'∇f',v:`(${M.round(fx,2)}, ${M.round(fy,2)})`}]);
+      // contour
+      const lim=3.2; const cc=cont.chart({m:{t:10,r:10,b:24,l:30}}); cc.setX(-lim,lim).setY(-lim,lim); cc.clear();
+      cc.gridlines(niceTicks(-lim,lim,6),niceTicks(-lim,lim,6)); cc.axes();
+      let zs=[]; for(let i=0;i<20;i++)for(let j=0;j<20;j++)zs.push(g(-lim+6.4*i/19,-lim+6.4*j/19)); zs=zs.filter(isFinite);
+      const zlo=M.min(zs),zhi=M.max(zs); const levels=[]; for(let k=1;k<10;k++)levels.push(zlo+(zhi-zlo)*k/10);
+      drawContours(cc,g,levels,COL.calc3,0.55);
+      cc.line(-lim,y0,lim,y0,hexA(COL.calc1,.5),1.5,[4,3]); cc.line(x0,-lim,x0,lim,hexA(COL.calc2,.5),1.5,[4,3]);
+      cc.dot(x0,y0,COL.coral,5); cc.axisX(niceTicks(-lim,lim,5)); cc.axisY(niceTicks(-lim,lim,5));
+      // slice along x
+      drawSlice(sx,t=>g(t,y0),x0,fx,COL.calc1);
+      drawSlice(sy,t=>g(x0,t),y0,fy,COL.calc2);
+    }
+    function drawSlice(card,h,t0,slope,col){
+      const ch=card.chart({m:{t:10,r:10,b:22,l:34}}); ch.setX(-3.2,3.2);
+      let ys=[]; for(let i=0;i<=80;i++){ const t=-3.2+6.4*i/80,y=h(t); if(isFinite(y))ys.push(y);} let ylo=M.min(ys),yhi=M.max(ys); let p=(yhi-ylo)*.15||1; ch.setY(ylo-p,yhi+p); ch.clear();
+      ch.gridlines(niceTicks(-3.2,3.2,5),niceTicks(ylo-p,yhi+p,4)); ch.axes(); ch.axisX(niceTicks(-3.2,3.2,5)); ch.axisY(niceTicks(ylo-p,yhi+p,4));
+      ch.curve(h,col,2.4); const y0=h(t0); ch.line(t0-1.4,y0-slope*1.4,t0+1.4,y0+slope*1.4,COL.coral,2); ch.dot(t0,y0,COL.ink,4.5);
+    }
+    render();
+  }
+});
+
+/* ----- 15. Gradient & Directional Derivative (Ch 14.6) ----- */
+add({ id:'gradient-field', cat:'calc3', tag:'interactive', title:'Gradient & Direction', diff:'adv', ch:'Ch 14.6',
+  questions:['Why does the gradient vector always point perpendicular to the contour lines?','In which direction is the directional derivative largest? Smallest?','What is the directional derivative in a direction tangent to a contour?'],
+  blurb:'See the gradient field over a surface\u2019s contour map and measure the slope in any direction you choose.',
+  build(host){
+    const fin=makeFnInput('f(x, y)','x^2 + y^2',['x','y'],()=>render());
+    const px=UI.slider({label:'point x',min:-3,max:3,step:.1,value:1.2,fmt:v=>v.toFixed(1),oninput:render});
+    const py=UI.slider({label:'point y',min:-3,max:3,step:.1,value:.8,fmt:v=>v.toFixed(1),oninput:render});
+    const dir=UI.slider({label:'direction angle (°)',min:0,max:360,step:5,value:45,fmt:v=>v+'°',oninput:render});
+    const stats=UI.statsBox(); const plot=UI.plotCard('Contours, gradient (coral), chosen direction (blue)',380);
+    host.appendChild(UI.appGrid([fin,px,py,dir,stats,UI.note('The <b>gradient</b> ∇f points in the direction of steepest ascent, perpendicular to the contour through the point, with length equal to that steepest slope. The <b>directional derivative</b> Dᵤf = ∇f·u peaks when u aligns with ∇f.')],[plot]));
+    function render(){
+      const f=fin.fn(); if(!f)return; const x0=px.get(),y0=py.get(),th=dir.get()*Math.PI/180;
+      const [gx,gy]=M.grad((x,y)=>f(x,y),x0,y0); const gmag=Math.hypot(gx,gy);
+      const u=[Math.cos(th),Math.sin(th)]; const Du=gx*u[0]+gy*u[1];
+      stats.set([{k:'∇f',v:`(${M.round(gx,2)}, ${M.round(gy,2)})`,accent:1},{k:'|∇f| (max slope)',v:M.round(gmag,3),accent:1},{k:'direction Dᵤf',v:M.round(Du,3),accent:1},{k:'max possible',v:M.round(gmag,3)}]);
+      const lim=3.4; const ch=plot.chart({m:{t:12,r:12,b:26,l:32}}); ch.setX(-lim,lim).setY(-lim,lim); ch.clear();
+      ch.gridlines(niceTicks(-lim,lim,6),niceTicks(-lim,lim,6)); ch.axes();
+      const g=(x,y)=>f(x,y);
+      let zs=[]; for(let i=0;i<20;i++)for(let j=0;j<20;j++)zs.push(g(-lim+2*lim*i/19,-lim+2*lim*j/19)); zs=zs.filter(isFinite);
+      const zlo=M.min(zs),zhi=M.max(zs); const levels=[]; for(let k=1;k<12;k++)levels.push(zlo+(zhi-zlo)*k/12);
+      drawContours(ch,g,levels,COL.calc3,0.45);
+      // small gradient field arrows
+      for(let i=-2;i<=2;i++)for(let j=-2;j<=2;j++){ const X=i*1.3,Y=j*1.3; const [a,b]=M.grad(g,X,Y); const L=Math.hypot(a,b)||1; const s=0.5; ch.arrow(X,Y,X+a/L*s,Y+b/L*s,hexA(COL.calc2,.45),1.4); }
+      // gradient at point + direction
+      const gs=1/(gmag||1)*1.4; ch.arrow(x0,y0,x0+gx*gs/1.4*0.9,y0+gy*gs/1.4*0.9,COL.coral,2.8);
+      ch.arrow(x0,y0,x0+u[0]*1.2,y0+u[1]*1.2,COL.calc1,2.4);
+      ch.dot(x0,y0,COL.ink,5); ch.axisX(niceTicks(-lim,lim,5)); ch.axisY(niceTicks(-lim,lim,5));
+    }
+    render();
+  }
+});
+
+/* ----- 16. Double Integral / Volume (Ch 15.1 / 15.2) ----- */
+add({ id:'double-integral', cat:'calc3', tag:'interactive', title:'Double Integrals', diff:'adv', ch:'Ch 15.1',
+  questions:['What does each little box height f(xᵢ,yⱼ) represent in the Riemann sum?','As the grid gets finer, does the sum approach the true volume under the surface?','How would integrating x-first vs. y-first (Fubini) change the answer?'],
+  blurb:'Approximate the volume under z = f(x,y) over a rectangle with a grid of sample boxes.',
+  build(host){
+    const fin=makeFnInput('f(x, y)','x^2 + y^2',['x','y'],()=>render());
+    const xr=UI.text({label:'x from … to …',value:'0, 2',hint:'two numbers',onchange:render});
+    const yr=UI.text({label:'y from … to …',value:'0, 2',hint:'two numbers',onchange:render});
+    const n=UI.slider({label:'grid divisions per side',min:1,max:24,value:6,fmt:v=>v,oninput:render});
+    const stats=UI.statsBox(); const plot=UI.plotCard('Region with sample grid (color = f value / box height)',360);
+    host.appendChild(UI.appGrid([fin,xr,yr,n,stats,UI.note('The double integral ∬f dA is approximated by Σ f(xᵢ,yⱼ)·ΔA — a sum of box volumes over the grid. Darker cells are taller (larger f). As the grid refines, the midpoint sum converges to the exact volume.')],[plot]));
+    function render(){
+      const f=fin.fn(); if(!f)return; const xp=parseAB(xr.get()),yp=parseAB(yr.get()); if(!xp||!yp)return;
+      let[xa,xb]=xp; if(xb<xa)[xa,xb]=[xb,xa]; let[ya,yb]=yp; if(yb<ya)[ya,yb]=[yb,ya];
+      const N=n.get(); const dx=(xb-xa)/N, dy=(yb-ya)/N, dA=dx*dy;
+      let sum=0, vmin=Infinity,vmax=-Infinity; const cells=[];
+      for(let i=0;i<N;i++)for(let j=0;j<N;j++){ const xc=xa+(i+.5)*dx, yc=ya+(j+.5)*dy; const v=f(xc,yc); sum+=v*dA; if(isFinite(v)){vmin=Math.min(vmin,v);vmax=Math.max(vmax,v);} cells.push({i,j,v}); }
+      // "exact" via fine midpoint sum
+      let exact=0; const FN=120,fdx=(xb-xa)/FN,fdy=(yb-ya)/FN; for(let i=0;i<FN;i++)for(let j=0;j<FN;j++){ exact+=f(xa+(i+.5)*fdx,ya+(j+.5)*fdy)*fdx*fdy; }
+      stats.set([{k:'grid',v:`${N}×${N}`},{k:'boxes',v:N*N},{k:'Σf·ΔA',v:M.round(sum,4),accent:1},{k:'exact ∬',v:M.round(exact,4),accent:1},{k:'error',v:M.round(Math.abs(sum-exact),4)}]);
+      const padx=(xb-xa)*0.1,pady=(yb-ya)*0.1; const ch=plot.chart(); ch.setX(xa-padx,xb+padx).setY(ya-pady,yb+pady); ch.clear();
+      ch.gridlines(niceTicks(xa-padx,xb+padx,6),niceTicks(ya-pady,yb+pady,6)); ch.axes();
+      const ctx=ch.ctx, span=(vmax-vmin)||1;
+      cells.forEach(c=>{ const x=xa+c.i*dx,y=ya+c.j*dy; const t=(c.v-vmin)/span; ctx.fillStyle=hexA(COL.calc3,0.12+0.55*t); ctx.fillRect(ch.X(x),ch.Y(y+dy),ch.X(x+dx)-ch.X(x),ch.Y(y)-ch.Y(y+dy)); ctx.strokeStyle=hexA(COL.calc2,.4); ctx.lineWidth=.6; ctx.strokeRect(ch.X(x),ch.Y(y+dy),ch.X(x+dx)-ch.X(x),ch.Y(y)-ch.Y(y+dy)); });
+      ctx.strokeStyle=COL.coral; ctx.lineWidth=2; ctx.strokeRect(ch.X(xa),ch.Y(yb),ch.X(xb)-ch.X(xa),ch.Y(ya)-ch.Y(yb));
+      ch.axisX(niceTicks(xa-padx,xb+padx,5)); ch.axisY(niceTicks(ya-pady,yb+pady,5));
+    }
+    render();
+  }
+});
+
+/* ----- 17. Lagrange Multipliers (Ch 14.8) ----- */
+add({ id:'lagrange', cat:'calc3', tag:'explore', title:'Lagrange Multipliers', diff:'adv', ch:'Ch 14.8',
+  questions:['At the optimum, how are ∇f and ∇g related geometrically?','Why does the optimum occur where a contour of f is tangent to the constraint curve?','What does the multiplier λ measure?'],
+  blurb:'Optimize f(x,y) along a constraint g(x,y)=0 and see why the gradients line up at the solution.',
+  build(host){
+    const fin=makeFnInput('objective f(x, y)','x*y',['x','y'],()=>render());
+    const gin=makeFnInput('constraint g(x, y) = 0','x^2 + y^2 - 1',['x','y'],()=>render(),'set equal to 0; e.g. x^2+y^2-1');
+    const mode=UI.seg({label:'find',options:[{label:'Maximum',value:'max'},{label:'Minimum',value:'min'}],value:'max',onchange:render});
+    const stats=UI.statsBox(); const plot=UI.plotCard('f contours (violet) · constraint g=0 (coral) · optimum (dot)',380);
+    host.appendChild(UI.appGrid([fin,gin,mode,stats,UI.note('To optimize f subject to g = 0, look for points where ∇f = λ∇g — i.e. a level curve of f is <b>tangent</b> to the constraint curve. The arrows show ∇f and ∇g aligning at the optimum.')],[plot]));
+    function render(){
+      const f=fin.fn(),g=gin.fn(); if(!f||!g)return;
+      // trace constraint g=0 by sampling angle/radius search on a grid, then walk it
+      const lim=2.2; const pts=[]; const NS=720;
+      // sample the zero set via marching on a fine grid (collect crossings)
+      const NG=160; for(let i=0;i<NG;i++){ const x=-lim+2*lim*i/NG; let prev=g(x,-lim); for(let j=1;j<=NG;j++){ const y=-lim+2*lim*j/NG; const cur=g(x,y); if(isFinite(prev)&&isFinite(cur)&&prev*cur<0){ let lo=y-2*lim/NG,hi=y; for(let k=0;k<30;k++){const m=(lo+hi)/2; (g(x,lo)*g(x,m)<0)?hi=m:lo=m;} pts.push([x,(lo+hi)/2]); } prev=cur; } }
+      if(!pts.length){ stats.set([{k:'note',v:'no constraint curve in view'}]); const ch=plot.chart(); ch.setX(-lim,lim).setY(-lim,lim); ch.clear(); ch.gridlines(niceTicks(-lim,lim,6),niceTicks(-lim,lim,6)); ch.axes(); return; }
+      // evaluate f on the constraint, find optimum
+      let best=null; pts.forEach(p=>{ const v=f(p[0],p[1]); if(!isFinite(v))return; if(!best|| (mode.get()==='max'? v>best.v : v<best.v)) best={p,v}; });
+      const [bx,by]=best.p; const gf=M.grad((x,y)=>f(x,y),bx,by), gg=M.grad((x,y)=>g(x,y),bx,by);
+      const lam=(Math.hypot(...gg)>1e-6)? (gf[0]*gg[0]+gf[1]*gg[1])/(gg[0]*gg[0]+gg[1]*gg[1]) : 0;
+      stats.set([{k:mode.get()==='max'?'max f':'min f',v:M.round(best.v,4),accent:1},{k:'at (x,y)',v:`(${M.round(bx,2)}, ${M.round(by,2)})`,accent:1},{k:'∇f',v:`(${M.round(gf[0],2)}, ${M.round(gf[1],2)})`},{k:'λ (multiplier)',v:M.round(lam,3),accent:1}]);
+      const ch=plot.chart({m:{t:12,r:12,b:26,l:32}}); ch.setX(-lim,lim).setY(-lim,lim); ch.clear();
+      ch.gridlines(niceTicks(-lim,lim,6),niceTicks(-lim,lim,6)); ch.axes();
+      let zs=[]; for(let i=0;i<20;i++)for(let j=0;j<20;j++)zs.push(f(-lim+2*lim*i/19,-lim+2*lim*j/19)); zs=zs.filter(isFinite);
+      const zlo=M.min(zs),zhi=M.max(zs); const levels=[]; for(let k=1;k<12;k++)levels.push(zlo+(zhi-zlo)*k/12);
+      drawContours(ch,(x,y)=>f(x,y),levels,COL.calc3,0.4);
+      // constraint curve as dots
+      const ctx=ch.ctx; ctx.fillStyle=COL.coral; pts.forEach(p=>{ ctx.beginPath(); ctx.arc(ch.X(p[0]),ch.Y(p[1]),1.6,0,M.TAU); ctx.fill(); });
+      // gradients at optimum
+      const sf=0.8/(Math.hypot(...gf)||1), sg=0.8/(Math.hypot(...gg)||1);
+      ch.arrow(bx,by,bx+gf[0]*sf,by+gf[1]*sf,COL.calc1,2.4);
+      ch.arrow(bx,by,bx+gg[0]*sg,by+gg[1]*sg,COL.calc2,2.4);
+      ch.dot(bx,by,COL.ink,6); ch.axisX(niceTicks(-lim,lim,5)); ch.axisY(niceTicks(-lim,lim,5));
+    }
+    render();
+  }
+});
+/* --------------------- (4) CATALOG RENDERING ------------------------ */
+const DIFF_LABEL={intro:'Intro',inter:'Intermediate',adv:'Advanced'};
+const DIFF_CLASS={intro:'diff-intro',inter:'diff-inter',adv:'diff-adv'};
+function renderCatalog(){
+  const root=document.getElementById('catalog'); root.innerHTML='';
+  const nav=document.getElementById('topnav'); nav.innerHTML='';
+  document.getElementById('appletCount').textContent=APPLETS.length;
+  Object.entries(CATS).forEach(([key,cat])=>{
+    const items=APPLETS.filter(a=>a.cat===key); if(!items.length)return;
+    const a=document.createElement('a'); a.href='#'+key; a.textContent=cat.name; nav.appendChild(a);
+    const sec=document.createElement('section'); sec.className='section'; sec.id='sec-'+key; sec.style.setProperty('--cat',cat.color);
+    const head=document.createElement('div'); head.className='sec-head';
+    head.innerHTML=`<span class="num">${cat.n}</span><h2>${cat.name}</h2><span class="desc">${cat.desc}</span>`;
+    const grid=document.createElement('div'); grid.className='grid'; grid.id='grid-'+key;
+    items.forEach(ap=>{
+      const dc=DIFF_CLASS[ap.diff||'intro']||'diff-intro';
+      const dl=DIFF_LABEL[ap.diff||'intro']||'Intro';
+      const card=document.createElement('button'); card.className='card';
+      card.dataset.title=(ap.title+' '+ap.blurb+' '+ap.tag+' '+(ap.ch||'')).toLowerCase();
+      card.dataset.cat=key;
+      card.style.setProperty('--cat',cat.color);
+      card.innerHTML=`<div style="display:flex;align-items:center;gap:6px;"><span class="tag">${ap.tag}</span><span class="diff ${dc}">${dl}</span></div>
+        <span class="ttl">${ap.title}</span><span class="blurb">${ap.blurb}</span>
+        <div style="display:flex;align-items:center;gap:6px;margin-top:2px;"><span class="ch">${ap.ch||''}</span></div>
+        <svg class="go" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M13 6l6 6-6 6"/></svg>`;
+      card.onclick=()=>goApplet(ap.id); grid.appendChild(card);
+    });
+    sec.append(head,grid); root.appendChild(sec);
+  });
+}
+function filterCatalog(q){
+  q=q.toLowerCase().trim();
+  let anyVisible=false;
+  document.querySelectorAll('#catalog .card').forEach(card=>{
+    const match=!q||card.dataset.title.includes(q);
+    card.style.display=match?'':'none';
+    if(match)anyVisible=true;
+  });
+  document.querySelectorAll('#catalog .section').forEach(sec=>{
+    const key=sec.id.replace('sec-','');
+    const grid=document.getElementById('grid-'+key);
+    const hasVisible=grid&&[...grid.querySelectorAll('.card')].some(c=>c.style.display!=='none');
+    sec.style.display=hasVisible?'':'none';
+  });
+  document.getElementById('searchEmpty').style.display=anyVisible?'none':'block';
+}
+
+/* ------------------------- (5) ROUTER ------------------------------- */
+const homeEl=document.getElementById('home'), viewEl=document.getElementById('appletView');
+function goHome(){ location.hash=''; showHome(); }
+function showHome(){ viewEl.style.display='none'; homeEl.style.display='block'; }
+function goApplet(id){ location.hash='/'+id; }
+
+let _dark=false;
+const darkStyle=document.createElement('style'); darkStyle.id='dark-override-style'; document.head.appendChild(darkStyle);
+function applyDark(d){
+  _dark=d; const icon=document.getElementById('darkIcon');
+  if(d){
+    darkStyle.textContent=`body.dark-override{--paper:#11161F;--paper-2:#1A2230;--ink:#EAF0F5;--ink-soft:#A8B4C2;--ink-faint:#65728200;--ink-faint:#6B7888;--line:#2A3340;--grid:#1B2330;--white:#1A2230;--shadow-sm:0 1px 2px rgba(0,0,0,.3);--shadow-md:0 4px 16px rgba(0,0,0,.4);--shadow-lg:0 12px 32px rgba(0,0,0,.5);}
+    body.dark-override{background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);}
+    body.dark-override .topbar{background:rgba(17,22,31,.88);}
+    body.dark-override .ctrl input[type=number],body.dark-override .ctrl input[type=text],body.dark-override .ctrl select,body.dark-override .ctrl textarea{background:var(--paper-2);border-color:var(--line);color:var(--ink);}
+    body.dark-override .abtn{background:var(--paper-2);color:var(--ink);}
+    body.dark-override .back{background:var(--paper-2);}
+    body.dark-override .search-box{background:var(--paper-2);}
+    body.dark-override .formula{background:var(--paper-2);}`;
+    icon.setAttribute('d','M12 3v1m0 16v1m9-9h-1M4 12H3m15.364-6.364l-.707.707M6.343 17.657l-.707.707M17.657 17.657l-.707-.707M6.343 6.343l-.707-.707M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8z');
+  } else { darkStyle.textContent=''; icon.setAttribute('d','M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z'); }
+  document.body.classList.toggle('dark-override',d);
+  COL.paper = d? '#1A2230' : '#F7FAFA'; COL.grid=d?'#1B2330':'#E4ECEC'; COL.line=d?'#2A3340':'#D8E3E3';
+  COL.ink=d?'#EAF0F5':'#15233A'; COL.soft=d?'#A8B4C2':'#445268'; COL.faint=d?'#6B7888':'#82909F';
+  if(viewEl.style.display==='block'){ const id=location.hash.slice(2); if(id)openApplet(decodeURIComponent(id)); }
+  else heroAnim();
+}
+function toggleDark(){ _dark=!_dark; try{localStorage.setItem('cl-dark',_dark?'1':'0');}catch(e){} applyDark(_dark); }
+
+function shareApplet(){
+  const btn=document.getElementById('shareBtn');
+  navigator.clipboard.writeText(location.href).then(()=>{
+    btn.textContent='✓ Link copied!'; btn.classList.add('copied');
+    setTimeout(()=>{ btn.textContent='Share ↗'; btn.classList.remove('copied'); },2000);
+  }).catch(()=>{ window.prompt('Copy this link:',location.href); });
+}
+
+document.addEventListener('keydown',e=>{
+  if(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA'||e.target.tagName==='SELECT')return;
+  if(e.key==='Escape'&&viewEl.style.display==='block') goHome();
+  if(e.key==='/'){ e.preventDefault(); document.getElementById('searchInput')?.focus(); goHome(); }
+});
+
+function openApplet(id){
+  const ap=APPLETS.find(a=>a.id===id); if(!ap){ showHome(); return; }
+  const cat=CATS[ap.cat];
+  homeEl.style.display='none'; viewEl.style.display='block'; viewEl.style.setProperty('--accent',cat.color);
+  viewEl.innerHTML='';
+  const w=document.createElement('div'); w.className='wrap';
+  const top=document.createElement('div'); top.className='app-top';
+  top.innerHTML=`<button class="back" onclick="goHome()"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 12H5M11 18l-6-6 6-6"/></svg>All tools</button>
+    <span class="app-cat" style="background:${cat.color}">${cat.name}${ap.ch?' · '+ap.ch:''}</span>
+    <button class="share-btn" id="shareBtn" onclick="shareApplet()">Share ↗</button>
+    <span class="kbd" style="margin-left:auto"><kbd>Esc</kbd> to go back</span>`;
+  const head=document.createElement('div'); head.className='app-head';
+  const guidingHTML = ap.questions ? `<div class="guiding"><div class="q-title">🎯 Think about these as you explore</div><ol>${ap.questions.map(q=>`<li>${q}</li>`).join('')}</ol></div>` : '';
+  head.innerHTML=`<h2>${ap.title}</h2><p>${ap.blurb}</p>${guidingHTML}`;
+  const hostBox=document.createElement('div');
+  w.append(top,head,hostBox); viewEl.appendChild(w);
+  try{ ap.build(hostBox); }catch(e){ hostBox.innerHTML=`<div class="panel">This tool hit an error: <code>${e.message}</code></div>`; console.error(e); }
+  hostBox.addEventListener('keydown',e=>{
+    if(e.key==='Enter'&&e.target.tagName!=='BUTTON'&&e.target.tagName!=='TEXTAREA'){
+      const primaryBtns=hostBox.querySelectorAll('.abtn.primary');
+      if(primaryBtns.length===1){ e.preventDefault(); primaryBtns[0].click(); }
+    }
+  });
+  window.scrollTo(0,0);
+}
+function route(){ const h=location.hash; if(h.startsWith('#/')) openApplet(decodeURIComponent(h.slice(2))); else if(h&&document.getElementById('sec-'+h.slice(1))){ showHome(); } else showHome(); }
+window.addEventListener('hashchange',route);
+
+/* -------------------- (6) HERO ANIMATION ---------------------------- */
+function heroAnim(){
+  const cv=document.getElementById('heroCanvas'); if(!cv)return;
+  const ch=new Chart(cv,{cssH:300,m:{t:16,r:16,b:30,l:36}});
+  const f=x=>0.18*x*x*x-0.6*x; // a cubic, nice tangents
+  const a=1.1;
+  let h=2.6; const reduce=window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function frame(){
+    ch.setX(-3.5,3.5).setY(-3.5,3.5); ch.clear();
+    ch.gridlines(niceTicks(-3.5,3.5,6),niceTicks(-3.5,3.5,6)); ch.axes();
+    ch.curve(f,COL.calc1,2.6);
+    const fa=f(a),fah=f(a+h),sec=(fah-fa)/h, deriv=M.nderiv(f,a);
+    ch.line(-3.5,deriv*(-3.5-a)+fa,3.5,deriv*(3.5-a)+fa,hexA(COL.calc2,.5),2,[6,4]);
+    ch.line(-3.5,sec*(-3.5-a)+fa,3.5,sec*(3.5-a)+fa,COL.coral,2.4);
+    ch.dot(a,fa,COL.ink,5); ch.dot(a+h,fah,COL.amber,5);
+    document.getElementById('heroH').textContent=M.round(h,2);
+    document.getElementById('heroSlope').textContent=M.round(sec,3);
+    document.getElementById('heroDeriv').textContent=M.round(deriv,3);
+    h*=0.94; if(h<0.05)h=2.6;
+    if(!reduce) heroRAF=requestAnimationFrame(()=>setTimeout(frame,60));
+  }
+  if(window.heroRAF)cancelAnimationFrame(window.heroRAF);
+  if(reduce){ h=0.05; frame(); } else frame();
+}
+
+/* ----------------------------- INIT --------------------------------- */
+renderCatalog();
+try{ if(localStorage.getItem('cl-dark')==='1'){ _dark=true; } }catch(e){}
+applyDark(_dark);
+heroAnim();
+route();
+let _rz; window.addEventListener('resize',()=>{ clearTimeout(_rz); _rz=setTimeout(()=>{ if(viewEl.style.display==='block'){ const id=location.hash.slice(2); if(id)openApplet(decodeURIComponent(id)); } else heroAnim(); },180); });
+
+const searchWrap=document.querySelector('.search-wrap');
+if(searchWrap){
+  const hint=document.createElement('div'); hint.className='kbd'; hint.style.cssText='margin-top:8px;display:inline-flex;';
+  hint.innerHTML='<kbd>/</kbd> to search &nbsp; <kbd>Esc</kbd> to go back';
+  searchWrap.appendChild(hint);
+}
+</script>
+</body>
+</html>
