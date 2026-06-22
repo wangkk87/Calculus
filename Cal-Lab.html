@@ -98,6 +98,12 @@ canvas{display:block;}
 .sec-head h2{font-family:var(--display);font-weight:600;font-size:1.7rem;letter-spacing:-.01em;margin:0;display:flex;align-items:center;gap:12px;}
 .sec-head h2::before{content:"";width:13px;height:13px;border-radius:4px;background:var(--cat,var(--ink));}
 .sec-head .desc{font-size:.9rem;color:var(--ink-soft);margin-left:auto;max-width:38ch;text-align:right;}
+.enrich{display:flex;align-items:center;gap:14px;background:var(--white);border:1px solid var(--line);border-left:3px solid var(--cat,var(--ink));border-radius:12px;padding:11px 16px;margin:-6px 0 24px;box-shadow:var(--shadow-sm);}
+.enrich .etag{flex:none;font-family:var(--mono);font-size:.68rem;font-weight:600;letter-spacing:.03em;text-transform:uppercase;color:var(--cat,var(--ink));background:color-mix(in srgb,var(--cat,#888) 12%,transparent);padding:4px 9px;border-radius:20px;}
+.enrich .etext{flex:1;font-size:.92rem;color:var(--ink-soft);line-height:1.45;}
+.enrich button{flex:none;width:28px;height:28px;border:1px solid var(--line);background:var(--paper);border-radius:8px;color:var(--ink-soft);font-size:.95rem;cursor:pointer;transition:.15s;}
+.enrich button:hover{border-color:var(--cat,var(--ink));color:var(--cat,var(--ink));transform:rotate(90deg);}
+@media(max-width:640px){.enrich{flex-wrap:wrap;gap:8px;}.enrich .etext{flex-basis:100%;order:3;}}
 
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(248px,1fr));gap:16px;}
 .card{position:relative;text-align:left;background:var(--white);border:1px solid var(--line);border-radius:var(--r-md);padding:18px 18px 16px;cursor:pointer;transition:.18s;display:flex;flex-direction:column;gap:8px;min-height:128px;width:100%;border-top:3px solid var(--cat,var(--ink));}
@@ -476,9 +482,30 @@ function niceTicks(min,max,n=6){ const span=max-min||1; const step0=span/n; cons
   const t=[]; let v=Math.ceil(min/step)*step; while(v<=max+1e-9){ t.push(M.round(v,6)); v+=step; } return t; }
 /* ----------------------- (3) UI + REGISTRY -------------------------- */
 const CATS = {
-  calc1:{name:'Calculus I',   color:COL.calc1, n:'01', desc:'Functions, limits, derivatives, and the integral. Chapters 1–5.'},
-  calc2:{name:'Calculus II',  color:COL.calc2, n:'02', desc:'Integration applications & techniques, series, polar curves. Chapters 6–8, 10–11.'},
-  calc3:{name:'Calculus III', color:COL.calc3, n:'03', desc:'Vectors, multivariable functions, and multiple integrals. Chapters 12–15.'},
+  calc1:{name:'Calculus I',   color:COL.calc1, n:'01', desc:'Functions, limits, derivatives, and the integral. Chapters 1–5.',
+    facts:[
+      {t:'fact',s:'“Calculus” is Latin for “small pebble” — Romans did arithmetic by sliding pebbles on a counting board.'},
+      {t:'use',s:'Your phone’s GPS computes speed as the derivative of position dozens of times per second.'},
+      {t:'fact',s:'Newton and Leibniz invented calculus independently in the 1660s–70s, then feuded for decades over credit.'},
+      {t:'use',s:'Setting f′(x)=0 — optimization — is how airlines price seats and how factories minimize cost.'},
+      {t:'fact',s:'The integral sign ∫ is a stretched letter S, for the Latin “summa” (sum). Leibniz chose it in 1675.'}
+    ]},
+  calc2:{name:'Calculus II',  color:COL.calc2, n:'02', desc:'Integration applications & techniques, series, polar curves. Chapters 6–8, 10–11.',
+    facts:[
+      {t:'fact',s:'Your calculator finds sin, cos, and eˣ by quietly adding up a few terms of their Taylor series.'},
+      {t:'use',s:'CT and MRI scanners rebuild a 3D image by integrating signal along thousands of cross-sections.'},
+      {t:'fact',s:'The harmonic series 1+½+⅓+… diverges, but so slowly it needs ~10⁴³ terms just to pass 100.'},
+      {t:'fact',s:'Gabriel’s Horn (y=1/x revolved) has finite volume yet infinite surface area — fillable, but unpaintable.'},
+      {t:'use',s:'Arc-length integrals tell engineers exactly how much cable a suspension bridge’s curve requires.'}
+    ]},
+  calc3:{name:'Calculus III', color:COL.calc3, n:'03', desc:'Vectors, multivariable functions, and multiple integrals. Chapters 12–15.',
+    facts:[
+      {t:'fact',s:'The gradient ∇f always points straight uphill — the basis of how ML models “descend” to an answer.'},
+      {t:'use',s:'Maxwell’s equations, written in vector calculus (div & curl), predicted radio waves 20 years before anyone detected them.'},
+      {t:'fact',s:'A vector field’s curl measures local spin — it’s why hurricanes rotate and wings generate lift.'},
+      {t:'use',s:'Triple integrals compute the mass, center of gravity, and moment of inertia of any 3D object.'},
+      {t:'use',s:'Lagrange multipliers run behind economics, engineering, and “optimize subject to a constraint” everywhere.'}
+    ]},
 };
 const APPLETS = [];
 const add = (a)=>APPLETS.push(a);
@@ -582,6 +609,7 @@ add({ id:'function-transforms', cat:'calc1', tag:'explore', title:'Function Tran
     const reset=UI.buttons([{label:'Reset to f(x)',onclick:()=>{a.set(1);b.set(1);c.set(0);d.set(0);render();}}]);
     const f=UI.formula(''); const plot=UI.plotCard('y = a · f(b(x − c)) + d',360);
     host.appendChild(UI.appGrid([sel,a,b,c,d,reset,f,UI.note('The <b>base</b> graph is faint; the <b>transformed</b> graph is bold. Note that <b>c</b> shifts <em>right</em> when positive, and <b>b</b> compresses horizontally when |b| > 1.')],[plot]));
+    plot.enableZoom(render);
     function render(){
       const A=a.get(),B=b.get(),C=c.get(),D=d.get(),base=bases[key];
       const g=x=>A*base(B*(x-C))+D;
@@ -600,11 +628,13 @@ add({ id:'limit-explorer', cat:'calc1', tag:'interactive', title:'Limit Explorer
   questions:['Do the left and right values approach the same number? What does that tell you?','Does the limit care about the actual value f(a), or only nearby values?','Try (sin x)/x at x=0 — the function is undefined there, yet the limit exists. Why?'],
   blurb:'Approach a point from both sides and watch a table of f(x) values close in on the limit.',
   build(host){
-    const fin=makeFnInput('Function f(x)','sin(x)/x',['x'],()=>render(),'try (x^2-1)/(x-1), or sin(x)/x');
+    const fin=makeFnInput('Function f(x)','sin(x)/x',['x'],()=>render(),'use ( ) for grouping: sin(x)/(2*x), not sin(x)/2*x');
     const aIn=UI.number({label:'Approach x → a',value:0,step:'any',onchange:render});
     const plot=UI.plotCard('Zooming in on x = a',300);
     const tbl=document.createElement('div'); tbl.className='formula'; tbl.style.lineHeight='1.9';
-    host.appendChild(UI.appGrid([fin,aIn,UI.note('The table shows f(x) as x creeps toward a from the left (x < a) and right (x > a). If both columns head to the same number, that number is the <b>limit</b> — even when f(a) itself is undefined.'),tbl],[plot]));
+    host.appendChild(UI.appGrid([fin,aIn,UI.note('The table shows f(x) as x creeps toward a from each side. If both columns head to the same number, that number is the <b>limit</b> — even when f(a) is undefined (a <b>hollow dot</b>) or sits somewhere else (a removable hole). Drag/scroll the plot to zoom.'),tbl],[plot]));
+    plot.enableZoom(render);
+    function sideLimit(f,a,dir){ let v=NaN; for(const o of [1e-1,1e-2,1e-3,1e-4,1e-5,1e-6]){ const y=f(a+dir*o); if(isFinite(y))v=y; } return v; }
     function render(){
       const f=fin.fn(); if(!f)return; const a=aIn.get();
       const offs=[1,0.5,0.1,0.01,0.001];
@@ -613,20 +643,31 @@ add({ id:'limit-explorer', cat:'calc1', tag:'interactive', title:'Limit Explorer
       left.forEach(p=>{ rows+=`x=${M.round(p.x,4)} → f(x)=${isFinite(p.y)?M.round(p.y,5):'undefined'}<br>`; });
       rows+='<br><b>x → a⁺ (from right)</b><br>';
       right.forEach(p=>{ rows+=`x=${M.round(p.x,4)} → f(x)=${isFinite(p.y)?M.round(p.y,5):'undefined'}<br>`; });
-      const fa=f(a); rows+=`<br>f(${M.round(a,3)}) = ${isFinite(fa)?M.round(fa,5):'<span style="color:'+COL.coral+'">undefined</span>'}`;
-      const Lest=f(a+1e-6), Lest2=f(a-1e-6);
-      if(isFinite(Lest)&&isFinite(Lest2)&&Math.abs(Lest-Lest2)<1e-3)
-        rows+=`<br><b style="color:${COL.calc1}">limit ≈ ${M.round((Lest+Lest2)/2,5)}</b>`;
+      const fa=f(a); const Lm=sideLimit(f,a,-1), Lp=sideLimit(f,a,1);
+      const exists=isFinite(Lm)&&isFinite(Lp)&&Math.abs(Lp-Lm)<1e-3; const L=(Lp+Lm)/2;
+      rows+=`<br>left limit L⁻ ≈ ${isFinite(Lm)?M.round(Lm,5):'—'}`;
+      rows+=`<br>right limit L⁺ ≈ ${isFinite(Lp)?M.round(Lp,5):'—'}`;
+      rows+=`<br>f(${M.round(a,3)}) = ${isFinite(fa)?M.round(fa,5):'<span style="color:'+COL.coral+'">undefined</span>'}`;
+      if(exists){ rows+=`<br><b style="color:${COL.calc1}">limit = ${M.round(L,5)}</b>`;
+        if(!isFinite(fa)||Math.abs(fa-L)>1e-3) rows+=` <span style="color:${COL.amber}">(removable hole — f(a) ≠ limit)</span>`; }
       else rows+=`<br><b style="color:${COL.coral}">left ≠ right → limit does not exist</b>`;
       tbl.innerHTML=rows;
-      // plot zoomed near a
       const span=2; const ch=plot.chart(); ch.setX(a-span,a+span);
       const ys=[]; for(let i=0;i<=80;i++){ const x=a-span+2*span*i/80; const y=f(x); if(isFinite(y)&&Math.abs(y)<1e4)ys.push(y); }
-      const ylo=ys.length?M.min(ys):-2, yhi=ys.length?M.max(ys):2; const pad=(yhi-ylo)*0.15||1;
-      ch.setY(ylo-pad,yhi+pad); ch.clear(); ch.gridlines(niceTicks(a-span,a+span,5),niceTicks(ylo-pad,yhi+pad,5)); ch.axes();
-      ch.axisX(niceTicks(a-span,a+span,5)); ch.axisY(niceTicks(ylo-pad,yhi+pad,5));
+      let ylo=ys.length?M.min(ys):-2, yhi=ys.length?M.max(ys):2; if(exists){ylo=Math.min(ylo,L);yhi=Math.max(yhi,L);} const pad=(yhi-ylo)*0.15||1;
+      ch.setY(ylo-pad,yhi+pad); ch.clear(); ch.gridlines(niceTicks(ch.xmin,ch.xmax,5),niceTicks(ch.ymin,ch.ymax,5)); ch.axes();
+      ch.axisX(niceTicks(ch.xmin,ch.xmax,5)); ch.axisY(niceTicks(ch.ymin,ch.ymax,5));
       ch.curve(f,COL.calc1,2.4); ch.vline(a,hexA(COL.coral,.6),1.5,[4,3]);
-      if(isFinite(Lest)) ch.dot(a,(Lest+Lest2)/2,COL.coral,5);
+      const ctx=ch.ctx;
+      if(exists){
+        if(!isFinite(fa)||Math.abs(fa-L)>1e-3){ // open circle at the limit (a hole)
+          ctx.beginPath(); ctx.arc(ch.X(a),ch.Y(L),5,0,M.TAU); ctx.fillStyle=COL.paper; ctx.fill(); ctx.lineWidth=2; ctx.strokeStyle=COL.coral; ctx.stroke();
+          if(isFinite(fa)) ch.dot(a,fa,COL.calc1,5); // the actual (filled) value sits elsewhere
+        } else ch.dot(a,L,COL.coral,5);
+      } else { // one-sided: mark each approach value
+        if(isFinite(Lm)){ ctx.beginPath(); ctx.arc(ch.X(a),ch.Y(Lm),5,0,M.TAU); ctx.fillStyle=COL.paper; ctx.fill(); ctx.lineWidth=2; ctx.strokeStyle=COL.calc2; ctx.stroke(); }
+        if(isFinite(Lp)){ ctx.beginPath(); ctx.arc(ch.X(a),ch.Y(Lp),5,0,M.TAU); ctx.fillStyle=COL.paper; ctx.fill(); ctx.lineWidth=2; ctx.strokeStyle=COL.calc3; ctx.stroke(); }
+      }
     }
     render();
   }
@@ -645,6 +686,7 @@ add({ id:'epsilon-delta', cat:'calc1', tag:'interactive', title:'The ε–δ Def
     const plot=UI.plotCard('Does the curve stay in the green box?',360);
     const verdict=UI.note('');
     host.appendChild(UI.appGrid([fin,aIn,eps,del,auto,UI.note('Pick ε first. The challenge is to choose <b>δ</b> so that whenever 0 < |x − a| < δ, the output stays within ε of L. The green box must contain the curve across its full width.'),verdict],[plot]));
+    plot.enableZoom(render);
     function render(){
       const f=fin.fn(); if(!f)return; const a=aIn.get(), L=f(a), e=eps.get(), dl=del.get();
       const span=Math.max(2.5, dl*2.5); const ch=plot.chart(); ch.setX(a-span,a+span);
@@ -683,6 +725,7 @@ add({ id:'secant-tangent', cat:'calc1', tag:'interactive', title:'Secant → Tan
     const anim=UI.buttons([{label:'Animate h → 0',primary:true,onclick:animate}]);
     const stats=UI.statsBox(); const plot=UI.plotCard('Secant through (a, f(a)) and (a+h, f(a+h))',360);
     host.appendChild(UI.appGrid([fin,x0,h,anim,stats,UI.note('The <b>difference quotient</b> [f(a+h) − f(a)] / h is the secant slope. As <b>h → 0</b> it converges to f′(a), the tangent slope. The numeric and limit values are compared live.')],[plot]));
+    plot.enableZoom(render);
     function render(){
       const f=fin.fn(); if(!f)return; const a=x0.get(), H=h.get()||1e-6;
       const fa=f(a), fah=f(a+H); const sec=(fah-fa)/H; const deriv=M.nderiv(f,a);
@@ -713,6 +756,7 @@ add({ id:'derivative-grapher', cat:'calc1', tag:'explore', title:'Graph of the D
     const stats=UI.statsBox();
     const top=UI.plotCard('f(x) — original',230); const bot=UI.plotCard("f′(x) — derivative (slope of f above)",230);
     host.appendChild(UI.appGrid([fin,px,show2,stats,UI.note('The bottom graph plots the <b>slope</b> of the top graph. Wherever f is flat (a peak or valley), f′ crosses zero. Wherever f′ is above the axis, f is increasing.')],[top,bot]));
+    top.enableZoom(render); bot.enableZoom(render);
     function render(){
       const f=fin.fn(); if(!f)return; const x=px.get();
       const df=u=>M.nderiv(f,u), ddf=u=>M.nderiv2(f,u);
@@ -745,6 +789,7 @@ add({ id:'riemann-sums', cat:'calc1', tag:'interactive', title:'Riemann Sums', d
     const rule=UI.seg({label:'rule',options:[{label:'Left',value:'left'},{label:'Right',value:'right'},{label:'Mid',value:'mid'},{label:'Trap',value:'trap'}],value:'mid',onchange:render});
     const stats=UI.statsBox(); const plot=UI.plotCard('Riemann approximation',360);
     host.appendChild(UI.appGrid([fin,ab,n,rule,stats,UI.note('The <b>signed area</b> of the rectangles estimates ∫f dx. As <b>n → ∞</b> the estimate converges to the exact definite integral (computed here by high-precision Simpson\u2019s rule for comparison).')],[plot]));
+    plot.enableZoom(render);
     function render(){
       const f=fin.fn(); if(!f)return; const parts=parseAB(ab.get()); if(!parts)return; let[a,b]=parts; if(b<a)[a,b]=[b,a];
       const N=n.get(), mode=rule.get();
@@ -769,6 +814,43 @@ add({ id:'riemann-sums', cat:'calc1', tag:'interactive', title:'Riemann Sums', d
       }
       ch.curve(f,COL.coral,2.6); ch.axisX(niceTicks(a-pad,b+pad,6)); ch.axisY(niceTicks(ylo-p,yhi+p,5));
       ch.marker(a,'a',COL.calc2); ch.marker(b,'b',COL.calc2);
+    }
+    render();
+  }
+});
+
+/* ----- Definite Integral & the Fundamental Theorem (Ch 5.3 / 5.4) ----- */
+add({ id:'definite-integral', cat:'calc1', tag:'interactive', title:'Definite Integral & FTC', diff:'inter', ch:'Ch 5.3',
+  questions:['Why does area below the x-axis count as negative in a definite integral?','The accumulation F(x) = ∫ₐˣ f(t)dt climbs where f is positive and falls where f is negative — can you see why?','How does the slope of the accumulation curve F relate back to f? (That\u2019s the FTC.)'],
+  blurb:'Shade the signed area under f between bounds a and b, read off the value, and watch the accumulation F(x) build it up.',
+  build(host){
+    const fin=makeFnInput('integrand f(x)','sin(x)',['x'],()=>render());
+    const ab=UI.text({label:'bounds [a, b]',value:'0, 6.2832',hint:'two numbers',onchange:render});
+    const stats=UI.statsBox();
+    const top=UI.plotCard('f(x) with signed area (teal = +, coral = −)',220);
+    const bot=UI.plotCard('Accumulation  F(x) = ∫ₐˣ f(t) dt',200);
+    host.appendChild(UI.appGrid([fin,ab,stats,UI.note('The definite integral ∫ₐᵇ f dx is the <b>signed</b> area: regions above the axis add, regions below subtract. The lower plot is the running total F(x); by the <b>Fundamental Theorem</b>, F′(x) = f(x), and F(b) equals the whole integral.')],[top,bot]));
+    top.enableZoom(render); bot.enableZoom(render);
+    function render(){
+      const f=fin.fn(); if(!f)return; const parts=parseAB(ab.get()); if(!parts)return; let[a,b]=parts; if(b<a)[a,b]=[b,a];
+      const net=M.integrate(f,a,b,1000);
+      const posA=M.integrate(x=>Math.max(0,f(x)),a,b,1000);
+      const negA=M.integrate(x=>Math.min(0,f(x)),a,b,1000);
+      stats.set([{k:'∫ₐᵇ f dx',v:M.round(net,4),accent:1},{k:'area above axis',v:M.round(posA,4)},{k:'area below axis',v:M.round(negA,4)},{k:'total |area|',v:M.round(posA-negA,4)}]);
+      const pad=(b-a)*0.06; const XL=a-pad,XR=b+pad;
+      let ys=[]; for(let i=0;i<=120;i++){ const x=a+(b-a)*i/120,y=f(x); if(isFinite(y))ys.push(y);} ys.push(0); let ylo=M.min(ys),yhi=M.max(ys); let p=(yhi-ylo)*.15||1;
+      // top: f with signed shading
+      const ch=top.chart(); ch.setX(XL,XR).setY(ylo-p,yhi+p); ch.clear(); ch.gridlines(niceTicks(ch.xmin,ch.xmax,6),niceTicks(ch.ymin,ch.ymax,5)); ch.axes();
+      const ctx=ch.ctx, Nn=260; for(let i=0;i<Nn;i++){ const xl=a+(b-a)*i/Nn, xr=a+(b-a)*(i+1)/Nn, xm=(xl+xr)/2, y=f(xm); if(!isFinite(y))continue; ctx.fillStyle=y>=0?hexA(COL.calc2,.22):hexA(COL.coral,.22); const yA=ch.Y(0),yB=ch.Y(y); ctx.fillRect(ch.X(xl),Math.min(yA,yB),ch.X(xr)-ch.X(xl)+0.6,Math.abs(yB-yA)); }
+      ch.curve(f,COL.calc1,2.4); ch.axisX(niceTicks(ch.xmin,ch.xmax,6)); ch.axisY(niceTicks(ch.ymin,ch.ymax,5)); ch.marker(a,'a',COL.coral); ch.marker(b,'b',COL.coral);
+      // bottom: accumulation F(x)
+      const M2=200; const Fx=[]; let acc=0; const dx=(b-a)/M2; Fx.push(0);
+      for(let i=1;i<=M2;i++){ const x0=a+(i-1)*dx, x1=a+i*dx; acc+=M.integrate(f,x0,x1,8); Fx.push(acc); }
+      const cb=bot.chart(); cb.setX(XL,XR);
+      let flo=Math.min(0,M.min(Fx)),fhi=Math.max(0,M.max(Fx)); let fp=(fhi-flo)*.15||1; cb.setY(flo-fp,fhi+fp); cb.clear();
+      cb.gridlines(niceTicks(cb.xmin,cb.xmax,6),niceTicks(cb.ymin,cb.ymax,5)); cb.axes(); cb.axisX(niceTicks(cb.xmin,cb.xmax,6)); cb.axisY(niceTicks(cb.ymin,cb.ymax,5));
+      cb.pline(Fx.map((_,i)=>cb.X(a+i*dx)),Fx.map(v=>cb.Y(v)),COL.calc2,2.4);
+      cb.dot(b,net,COL.coral,5); cb.line(XL,net,b,net,hexA(COL.coral,.5),1.4,[4,3]); cb.marker(a,'a',COL.slate);
     }
     render();
   }
@@ -1001,6 +1083,272 @@ add({ id:'arc-length', cat:'calc2', tag:'explore', title:'Arc Length & Surface A
       // polygon
       ch.pline(P.map(p=>ch.X(p.x)),P.map(p=>ch.Y(p.y)),COL.coral,2,[5,4]);
       P.forEach(p=>ch.dot(p.x,p.y,COL.amber,3.5));
+    }
+    render();
+  }
+});
+
+/* ----- Integration by Parts (Ch 7.1) ----- */
+add({ id:'integration-by-parts', cat:'calc2', tag:'explore', title:'Integration by Parts', diff:'inter', ch:'Ch 7.1',
+  questions:['In ∫u dv = uv − ∫v du, why does trading one integral for the other ever make the problem easier?','Geometrically, why do the two shaded areas plus nothing else fill the corner rectangle uv?','How do you choose which factor is u and which is dv? (Hint: LIATE.)'],
+  blurb:'See the formula ∫u dv = uv − ∫v du as a picture: two areas in the (u, v) plane that together tile the corner rectangle.',
+  build(host){
+    const uin=makeFnInput('u(x)','x',['x'],()=>render());
+    const vin=makeFnInput('v(x)   (antiderivative of dv)','exp(x)',['x'],()=>render(),'pick v so that dv = v′(x)dx is your second factor');
+    const ab=UI.text({label:'bounds [a, b]',value:'0, 1',hint:'two numbers',onchange:render});
+    const stats=UI.statsBox();
+    const plot=UI.plotCard('The curve (u(x), v(x)) and the two areas',360);
+    host.appendChild(UI.appGrid([uin,vin,ab,stats,UI.note('Plot the path (u(x), v(x)) as x runs a→b. The area between it and the <b>v-axis</b> is ∫u dv; between it and the <b>u-axis</b> is ∫v du. Together they fill the rectangle, so ∫u dv = [uv]ₐᵇ − ∫v du. Example: u=x, v=eˣ gives ∫x eˣ dx = x eˣ − ∫eˣ dx.')],[plot]));
+    plot.enableZoom(render);
+    function render(){
+      const u=uin.fn(), v=vin.fn(); if(!u||!v)return; const parts=parseAB(ab.get()); if(!parts)return; let[a,b]=parts; if(b<a)[a,b]=[b,a];
+      const Iudv=M.integrate(x=>u(x)*M.nderiv(v,x),a,b,1000);   // ∫ u dv
+      const Ivdu=M.integrate(x=>v(x)*M.nderiv(u,x),a,b,1000);   // ∫ v du
+      const uvB=u(b)*v(b)-u(a)*v(a);
+      stats.set([{k:'[uv]ₐᵇ',v:M.round(uvB,4)},{k:'∫ v du',v:M.round(Ivdu,4),accent:1},{k:'∫ u dv = [uv] − ∫v du',v:M.round(uvB-Ivdu,4),accent:1},{k:'check ∫u dv (direct)',v:M.round(Iudv,4)}]);
+      // path (u,v)
+      const U=[],V=[]; for(let i=0;i<=200;i++){ const x=a+(b-a)*i/200; const uu=u(x),vv=v(x); if(isFinite(uu)&&isFinite(vv)){U.push(uu);V.push(vv);} }
+      let ulo=Math.min(0,M.min(U)),uhi=Math.max(0,M.max(U)),vlo=Math.min(0,M.min(V)),vhi=Math.max(0,M.max(V));
+      const up=(uhi-ulo)*.12||1, vp=(vhi-vlo)*.12||1;
+      const ch=plot.chart({m:{t:14,r:16,b:30,l:40}}); ch.setX(ulo-up,uhi+up).setY(vlo-vp,vhi+vp); ch.clear();
+      ch.gridlines(niceTicks(ch.xmin,ch.xmax,6),niceTicks(ch.ymin,ch.ymax,5)); ch.axes();
+      const ctx=ch.ctx;
+      // ∫v du : area to the u-axis (vertical strips)  ; ∫u dv : area to the v-axis (horizontal strips)
+      ctx.fillStyle=hexA(COL.amber,.20); for(let i=0;i<U.length-1;i++){ const x0=ch.X(U[i]),x1=ch.X(U[i+1]); ctx.fillRect(Math.min(x0,x1),ch.Y(V[i]),Math.abs(x1-x0)+0.6,ch.Y(0)-ch.Y(V[i])); }
+      ctx.fillStyle=hexA(COL.calc2,.18); for(let i=0;i<V.length-1;i++){ const y0=ch.Y(V[i]),y1=ch.Y(V[i+1]); ctx.fillRect(ch.X(0),Math.min(y0,y1),ch.X(U[i])-ch.X(0),Math.abs(y1-y0)+0.6); }
+      // corner rectangle [uv] endpoints
+      ctx.strokeStyle=hexA(COL.coral,.7); ctx.lineWidth=1.5; ctx.setLineDash([4,3]);
+      ctx.strokeRect(ch.X(0),ch.Y(0),ch.X(U[U.length-1])-ch.X(0),ch.Y(V[V.length-1])-ch.Y(0)); ctx.setLineDash([]);
+      ch.pline(U.map(x=>ch.X(x)),V.map(y=>ch.Y(y)),COL.calc1,2.6);
+      ch.dot(U[0],V[0],COL.slate,4.5); ch.dot(U[U.length-1],V[V.length-1],COL.coral,4.5);
+      ctx.fillStyle=COL.soft; ctx.font='12px Inter,sans-serif'; ctx.fillText('∫v du',ch.X((M.min(U)+M.max(U))/2),ch.Y(0)-6); ctx.fillText('∫u dv',ch.X(0)+6,ch.Y((M.min(V)+M.max(V))/2));
+    }
+    render();
+  }
+});
+
+/* ----- Trigonometric Integrals (Ch 7.2) ----- */
+add({ id:'trig-integrals', cat:'calc2', tag:'explore', title:'Trigonometric Integrals', diff:'inter', ch:'Ch 7.2',
+  questions:['If one of the powers is odd, why can you always peel off one factor and substitute?','When both powers are even, why do you need the half-angle identities instead?','How does the area under sinᵐx cosⁿx over a full period depend on whether the powers are even or odd?'],
+  blurb:'Vary the powers in ∫ sinᵐx cosⁿx dx, see the integrand and its accumulation, and get the right reduction strategy.',
+  build(host){
+    const mS=UI.slider({label:'m  (power of sin)',min:0,max:5,step:1,value:2,fmt:v=>v,oninput:render});
+    const nS=UI.slider({label:'n  (power of cos)',min:0,max:5,step:1,value:0,fmt:v=>v,oninput:render});
+    const ab=UI.text({label:'bounds [a, b]',value:'0, 3.1416',hint:'two numbers',onchange:render});
+    const strat=UI.note(''); const stats=UI.statsBox();
+    const top=UI.plotCard('integrand  sinᵐx · cosⁿx  with signed area',220);
+    const bot=UI.plotCard('accumulation  ∫ₐˣ sinᵐt cosⁿt dt',190);
+    host.appendChild(UI.appGrid([mS,nS,ab,strat,stats],[top,bot]));
+    top.enableZoom(render); bot.enableZoom(render);
+    function render(){
+      const m=mS.get(), n=nS.get(); const f=x=>Math.pow(Math.sin(x),m)*Math.pow(Math.cos(x),n);
+      const parts=parseAB(ab.get()); if(!parts)return; let[a,b]=parts; if(b<a)[a,b]=[b,a];
+      const net=M.integrate(f,a,b,2000);
+      let s;
+      if(n%2===1) s=`<b>Cosine power is odd.</b> Split off one cos x (that becomes du), rewrite the remaining cos<sup>${n-1}</sup>x using cos²x = 1 − sin²x, then substitute <b>u = sin x</b>.`;
+      else if(m%2===1) s=`<b>Sine power is odd.</b> Split off one sin x (that becomes −du), rewrite sin<sup>${m-1}</sup>x using sin²x = 1 − cos²x, then substitute <b>u = cos x</b>.`;
+      else if(m===0&&n===0) s=`Both powers zero — the integrand is just 1, so the integral is b − a.`;
+      else s=`<b>Both powers even.</b> No single substitution works; use the half-angle identities sin²x = (1−cos 2x)/2 and cos²x = (1+cos 2x)/2 to lower the powers, then integrate term by term.`;
+      strat.innerHTML=s; strat.style.borderLeftColor=COL.calc2;
+      stats.set([{k:'integrand',v:`sin^${m}·cos^${n}`},{k:'∫ₐᵇ',v:M.round(net,4),accent:1}]);
+      // top
+      const ch=top.chart(); ch.setX(a-(b-a)*.04,b+(b-a)*.04);
+      let ys=[]; for(let i=0;i<=160;i++){const x=a+(b-a)*i/160;ys.push(f(x));} ys.push(0); let ylo=M.min(ys),yhi=M.max(ys); let p=(yhi-ylo)*.15||.2;
+      ch.setY(ylo-p,yhi+p); ch.clear(); ch.gridlines(niceTicks(ch.xmin,ch.xmax,6),niceTicks(ch.ymin,ch.ymax,5)); ch.axes();
+      const ctx=ch.ctx,Nn=240; for(let i=0;i<Nn;i++){const xl=a+(b-a)*i/Nn,xr=a+(b-a)*(i+1)/Nn,y=f((xl+xr)/2); ctx.fillStyle=y>=0?hexA(COL.calc2,.22):hexA(COL.coral,.22); const yA=ch.Y(0),yB=ch.Y(y); ctx.fillRect(ch.X(xl),Math.min(yA,yB),ch.X(xr)-ch.X(xl)+0.6,Math.abs(yB-yA));}
+      ch.curve(f,COL.calc1,2.4); ch.axisX(niceTicks(ch.xmin,ch.xmax,6)); ch.axisY(niceTicks(ch.ymin,ch.ymax,5)); ch.marker(a,'a',COL.coral); ch.marker(b,'b',COL.coral);
+      // bottom accumulation
+      const cb=bot.chart(); cb.setX(a-(b-a)*.04,b+(b-a)*.04); const K=160,F=[0]; let acc=0; const dx=(b-a)/K; for(let i=1;i<=K;i++){acc+=M.integrate(f,a+(i-1)*dx,a+i*dx,8);F.push(acc);}
+      let flo=Math.min(0,M.min(F)),fhi=Math.max(0,M.max(F)); let fp=(fhi-flo)*.15||.2; cb.setY(flo-fp,fhi+fp); cb.clear();
+      cb.gridlines(niceTicks(cb.xmin,cb.xmax,6),niceTicks(cb.ymin,cb.ymax,5)); cb.axes(); cb.axisX(niceTicks(cb.xmin,cb.xmax,6)); cb.axisY(niceTicks(cb.ymin,cb.ymax,5));
+      cb.pline(F.map((_,i)=>cb.X(a+i*dx)),F.map(v=>cb.Y(v)),COL.calc2,2.4); cb.dot(b,net,COL.coral,4.5);
+    }
+    render();
+  }
+});
+
+/* ----- Trigonometric Substitution (Ch 7.3) ----- */
+add({ id:'trig-substitution', cat:'calc2', tag:'explore', title:'Trig Substitution', diff:'adv', ch:'Ch 7.3',
+  questions:['Why does each radical form match exactly one trig identity (1−sin²=cos², 1+tan²=sec², sec²−1=tan²)?','On the reference triangle, which side is the radical, and why?','After integrating in θ, how do you use the triangle to convert the answer back to x?'],
+  blurb:'Match a radical to its reference right triangle, watch the angle θ move, and read off how dx and the radical transform.',
+  build(host){
+    let form='sin';
+    const seg=UI.seg({label:'radical form',options:[{label:'√(a²−x²)',value:'sin'},{label:'√(a²+x²)',value:'tan'},{label:'√(x²−a²)',value:'sec'}],value:'sin',onchange:v=>{form=v; sync(); render();}});
+    const aS=UI.slider({label:'a',min:1,max:5,step:.5,value:2,fmt:v=>v,oninput:render});
+    const xS=UI.slider({label:'x',min:0,max:4,step:.1,value:1.2,fmt:v=>v.toFixed(1),oninput:render});
+    const sub=UI.formula(''); const radical=UI.formula('');
+    const plot=UI.plotCard('Reference right triangle',360);
+    host.appendChild(UI.appGrid([seg,aS,xS,sub,radical,UI.note('Each form turns its radical into a perfect square under a Pythagorean identity. Build the right triangle from the substitution, integrate in θ, then read sin θ, cos θ, tan θ straight off the triangle to return to x.')],[plot]));
+    plot.enableZoom(render);
+    function sync(){ // keep x in a valid range for the secant form (needs x ≥ a)
+      if(form==='sec'){ xS.set(Math.max(aS.get(),xS.get())); }
+    }
+    function render(){
+      const a=aS.get(); let x=xS.get();
+      let opp,adj,hyp,subStr,radStr,thetaStr,radVal;
+      if(form==='sin'){ x=Math.min(x,a*0.999); opp=x; adj=Math.sqrt(Math.max(0,a*a-x*x)); hyp=a; radVal=adj;
+        subStr='x = a sin θ,&nbsp; dx = a cos θ dθ'; radStr=`√(a²−x²) = a cos θ = ${M.round(radVal,3)}`; thetaStr=`θ = arcsin(x/a) = ${M.round(Math.asin(x/a),3)}`; }
+      else if(form==='tan'){ opp=x; adj=a; hyp=Math.sqrt(a*a+x*x); radVal=hyp;
+        subStr='x = a tan θ,&nbsp; dx = a sec² θ dθ'; radStr=`√(a²+x²) = a sec θ = ${M.round(radVal,3)}`; thetaStr=`θ = arctan(x/a) = ${M.round(Math.atan(x/a),3)}`; }
+      else { x=Math.max(x,a); opp=Math.sqrt(Math.max(0,x*x-a*a)); adj=a; hyp=x; radVal=opp;
+        subStr='x = a sec θ,&nbsp; dx = a sec θ tan θ dθ'; radStr=`√(x²−a²) = a tan θ = ${M.round(radVal,3)}`; thetaStr=`θ = arcsec(x/a) = ${M.round(Math.acos(a/x),3)}`; }
+      sub.innerHTML=`<b>${subStr}</b><br><span style="color:var(--ink-soft)">${thetaStr}</span>`;
+      radical.innerHTML=radStr;
+      // draw triangle in a normalized box, scaled to fit
+      const ch=plot.chart(); ch.setX(0,1).setY(0,1); ch.clear(); const ctx=ch.ctx;
+      const big=Math.max(adj,opp,1e-6); const sc=0.62/big; const ox=0.16, oy=0.18; // bottom-left origin (angle θ)
+      const A={x:ox,y:oy}, B={x:ox+adj*sc,y:oy}, C={x:ox+adj*sc,y:oy+opp*sc};
+      const PX=q=>({x:ch.X(q.x),y:ch.Y(q.y)});
+      const pA=PX(A),pB=PX(B),pC=PX(C);
+      // fill
+      ctx.beginPath(); ctx.moveTo(pA.x,pA.y); ctx.lineTo(pB.x,pB.y); ctx.lineTo(pC.x,pC.y); ctx.closePath(); ctx.fillStyle=hexA(COL.calc2,.12); ctx.fill();
+      ctx.strokeStyle=COL.calc1; ctx.lineWidth=2.4; ctx.stroke();
+      // right-angle marker at B
+      const r=10; ctx.strokeStyle=COL.soft; ctx.lineWidth=1.4; ctx.beginPath(); ctx.moveTo(pB.x-r,pB.y); ctx.lineTo(pB.x-r,pB.y-r); ctx.lineTo(pB.x,pB.y-r); ctx.stroke();
+      // angle θ arc at A
+      ctx.strokeStyle=COL.amber; ctx.lineWidth=2; const hypAng=Math.atan2(pC.y-pA.y,pC.x-pA.x); ctx.beginPath(); ctx.arc(pA.x,pA.y,22,0,hypAng,true); ctx.stroke();
+      ctx.fillStyle=COL.amber; ctx.font='13px Inter,sans-serif'; ctx.fillText('θ',pA.x+26,pA.y-8);
+      // side labels
+      ctx.fillStyle=COL.ink; ctx.font='13px JetBrains Mono, monospace';
+      const adjLbl=form==='sin'?'√(a²−x²)':form==='tan'?'a':'a';
+      const oppLbl=form==='sin'?'x':form==='tan'?'x':'√(x²−a²)';
+      const hypLbl=form==='sin'?'a':form==='tan'?'√(a²+x²)':'x';
+      ctx.textAlign='center'; ctx.fillText(adjLbl,(pA.x+pB.x)/2,pB.y+18);
+      ctx.textAlign='left'; ctx.fillText(oppLbl,pB.x+8,(pB.y+pC.y)/2);
+      ctx.save(); ctx.translate((pA.x+pC.x)/2,(pA.y+pC.y)/2); ctx.rotate(Math.atan2(pC.y-pA.y,pC.x-pA.x)); ctx.textAlign='center'; ctx.fillStyle=COL.calc1; ctx.fillText(hypLbl,0,-8); ctx.restore();
+      ctx.textAlign='left';
+      // numeric values
+      ctx.fillStyle=COL.soft; ctx.font='12px Inter,sans-serif';
+      ctx.fillText(`a = ${a},  x = ${M.round(x,2)}`,ch.X(0.04),ch.Y(0.96));
+      ctx.fillText(`opp = ${M.round(opp,2)}   adj = ${M.round(adj,2)}   hyp = ${M.round(hyp,2)}`,ch.X(0.04),ch.Y(0.90));
+    }
+    sync(); render();
+  }
+});
+
+/* ----- Partial Fractions (Ch 7.4) ----- */
+add({ id:'partial-fractions', cat:'calc2', tag:'explore', title:'Partial Fractions', diff:'inter', ch:'Ch 7.4',
+  questions:['Why must each distinct linear factor (x − r) contribute exactly one term A/(x − r)?','Geometrically, how can several simple curves add up to the original rational function?','Once decomposed, why is each piece trivial to integrate (each gives a logarithm)?'],
+  blurb:'Break a rational function with distinct linear factors into simple pieces — and watch those pieces add back up to the original.',
+  build(host){
+    const numIn=makeFnInput('numerator N(x)','1',['x'],()=>render(),'a constant or low-degree polynomial');
+    const rootsIn=UI.text({label:'denominator roots (distinct)',value:'1, -1',hint:'2–4 numbers, e.g. 1, -1, 3',onchange:render});
+    const stats=UI.statsBox(); const decomp=UI.formula(''); const verdict=UI.note('');
+    const plot=UI.plotCard('original (bold) vs. component fractions',360);
+    host.appendChild(UI.appGrid([numIn,rootsIn,decomp,stats,verdict,UI.note('For a denominator (x−r₁)(x−r₂)… with distinct roots, each root contributes one term Aᵢ/(x−rᵢ). The cover-up rule gives Aᵢ = N(rᵢ) / ∏ⱼ≠ᵢ(rᵢ−rⱼ). The integral is then Σ Aᵢ ln|x−rᵢ|.')],[plot]));
+    plot.enableZoom(render);
+    function render(){
+      const N=numIn.fn(); if(!N)return;
+      const roots=(rootsIn.get()||'').split(/[\s,]+/).map(Number).filter(v=>!isNaN(v));
+      if(roots.length<2){ verdict.innerHTML='<b style="color:'+COL.coral+'">Enter at least two distinct roots.</b>'; return; }
+      // distinctness
+      let distinct=true; for(let i=0;i<roots.length;i++)for(let j=i+1;j<roots.length;j++) if(Math.abs(roots[i]-roots[j])<1e-6)distinct=false;
+      if(!distinct){ verdict.innerHTML='<b style="color:'+COL.coral+'">Roots must be distinct for this simple form (no repeated factors).</b>'; }
+      const Q=x=>roots.reduce((pr,r)=>pr*(x-r),1);
+      const f=x=>N(x)/Q(x);
+      // residues (cover-up)
+      const A=roots.map((ri,i)=>{ let denom=1; roots.forEach((rj,j)=>{ if(j!==i)denom*=(ri-rj); }); return N(ri)/denom; });
+      const comp=roots.map((ri,i)=>(x=>A[i]/(x-ri)));
+      // decomposition string
+      const fac=r=>`(x${r<0?'+'+M.round(-r,2):'−'+M.round(r,2)})`;
+      let ds=`N(x) / ${roots.map(fac).join('')} = `;
+      ds+=A.map((Ai,i)=>`${i>0?(Ai<0?' − ':' + '):''}${M.round(i>0?Math.abs(Ai):Ai,3)}/${fac(roots[i])}`).join('');
+      decomp.innerHTML=`<span style="font-size:.82rem">${ds}</span>`;
+      stats.set(A.map((Ai,i)=>({k:`A${'₁₂₃₄'[i]||i+1}  at r=${M.round(roots[i],2)}`,v:M.round(Ai,4),accent:i===0})));
+      if(distinct) verdict.innerHTML=`<b style="color:${COL.calc2}">∫ f dx = ${A.map((Ai,i)=>`${i>0?(Ai<0?'− ':'+ '):''}${M.round(i>0?Math.abs(Ai):Ai,2)} ln|x${roots[i]<0?'+'+M.round(-roots[i],2):'−'+M.round(roots[i],2)}|`).join(' ')} + C</b>`, verdict.style.borderLeftColor=COL.calc2;
+      // plot
+      let xlo=M.min(roots)-2, xhi=M.max(roots)+2;
+      const ch=plot.chart(); ch.setX(xlo,xhi); ch.setY(-6,6); ch.clear();
+      ch.gridlines(niceTicks(xlo,xhi,6),niceTicks(-6,6,6)); ch.axes(); ch.axisX(niceTicks(xlo,xhi,6)); ch.axisY(niceTicks(-6,6,6));
+      const cols=[COL.amber,COL.calc3,COL.coral,COL.slate];
+      comp.forEach((g,i)=>{ ch.curve(g,hexA(cols[i%cols.length],.85),1.6); });
+      // sum of components (should overlay original) and original
+      ch.curve(x=>comp.reduce((s,g)=>s+g(x),0),hexA(COL.calc2,.4),5);
+      ch.curve(f,COL.calc1,2.6);
+      roots.forEach(r=>ch.vline(r,hexA(COL.line,.9),1,[3,3]));
+    }
+    render();
+  }
+});
+
+/* ----- Improper Integrals (Ch 7.8) ----- */
+add({ id:'improper-integrals', cat:'calc2', tag:'interactive', title:'Improper Integrals', diff:'inter', ch:'Ch 7.8',
+  questions:['Can a region that stretches to infinity still enclose a finite area?','For ∫₁^∞ 1/xᵖ dx, what value of p is the boundary between converge and diverge?','How does the partial integral I(t) behave differently for a convergent vs. a divergent improper integral?'],
+  blurb:'Push a limit of integration to infinity (or into a vertical asymptote) and watch whether the area settles to a finite value or grows without bound.',
+  build(host){
+    let mode='inf';
+    const modeSeg=UI.seg({label:'type',options:[{label:'infinite interval  ∫ₐ^∞',value:'inf'},{label:'unbounded integrand',value:'sing'}],value:'inf',onchange:v=>{ mode=v; layout(); render(); }});
+    const fin=makeFnInput('integrand f(x)','1/x^2',['x'],()=>render(),'e.g. 1/x^2, 1/x, exp(-x), 1/sqrt(x)');
+    const ctrlHost=document.createElement('div'); ctrlHost.style.cssText='display:flex;flex-direction:column;gap:16px;';
+    const tSlider=UI.slider({label:'upper cutoff t',min:1,max:100,step:1,value:8,fmt:v=>v,oninput:render});
+    const stats=UI.statsBox(); const verdict=UI.note('');
+    const top=UI.plotCard('f(x) with area accumulated so far',220);
+    const bot=UI.plotCard('Partial integral I(t) — does it level off?',190);
+    let aIn,bIn;
+    host.appendChild(UI.appGrid([modeSeg,fin,ctrlHost,tSlider,stats,verdict],[top,bot]));
+    top.enableZoom(render); bot.enableZoom(render);
+    function layout(){ ctrlHost.innerHTML='';
+      if(mode==='inf'){ aIn=UI.number({label:'lower limit a',value:1,step:'any',onchange:render}); ctrlHost.appendChild(aIn);
+        tSlider.style.display=''; }
+      else { aIn=UI.number({label:'lower limit a',value:0,step:'any',onchange:render}); bIn=UI.number({label:'upper limit b (asymptote here)',value:1,step:'any',onchange:render}); ctrlHost.append(aIn,bIn); tSlider.style.display='none'; }
+    }
+    layout();
+    // robust improper limits via geometric panels (fine resolution where the area concentrates)
+    function infLimit(f,a){ const edges=[a, a+1]; while(edges[edges.length-1]<1e8) edges.push(edges[edges.length-1]*10);
+      let total=0,last=0; for(let i=0;i<edges.length-1;i++){ const c=M.integrate(f,edges[i],edges[i+1],1500); if(!isFinite(c))return {total:NaN,converges:false}; total+=c; last=c; }
+      const converges = isFinite(total) && Math.abs(last)<1e-3*Math.max(1,Math.abs(total)) && Math.abs(total)<1e7;
+      return {total,converges}; }
+    function singLimit(f,a,b){ const L=b-a; const fa=Math.abs(f(a+L*1e-6)), fb=Math.abs(f(b-L*1e-6)); const atA=fa>fb;
+      const edges=[]; if(atA){ for(let k=8;k>=1;k--)edges.push(a+L*Math.pow(10,-k)); edges.push(b); } else { edges.push(a); for(let k=1;k<=8;k++)edges.push(b-L*Math.pow(10,-k)); }
+      let total=0,nearest=0; for(let i=0;i<edges.length-1;i++){ const c=M.integrate(f,edges[i],edges[i+1],1200); if(!isFinite(c))return {total:NaN,converges:false,atA}; total+=c; if((atA&&i===0)||(!atA&&i===edges.length-2))nearest=c; }
+      const converges = isFinite(total) && Math.abs(nearest)<1e-3*Math.max(1,Math.abs(total)) && Math.abs(total)<1e7;
+      return {total,converges,atA}; }
+    function render(){
+      const f=fin.fn(); if(!f)return;
+      if(mode==='inf'){
+        const a=aIn.get(), t=tSlider.get();
+        const Ipartial=M.integrate(f,a,t,1500);
+        const lim=infLimit(f,a); const converges=lim.converges;
+        stats.set([{k:'cutoff t',v:t},{k:'I(t)=∫ₐᵗ f',v:M.round(Ipartial,4),accent:1},{k:'limit value',v:converges?M.round(lim.total,4):'∞',accent:1},{k:'verdict',v:converges?'converges':'diverges'}]);
+        verdict.innerHTML = converges
+          ? `<b style="color:${COL.calc2}">Converges</b> to ≈ ${M.round(lim.total,4)}. The area approaches a finite value as t → ∞.`
+          : `<b style="color:${COL.coral}">Diverges.</b> The partial area I(t) keeps growing without settling.`;
+        verdict.style.borderLeftColor = converges?COL.calc2:COL.coral;
+        // top
+        const XR=Math.max(t*1.1, a+1); const ch=top.chart(); ch.setX(a-(XR-a)*0.05,XR);
+        let ys=[]; for(let i=0;i<=120;i++){ const x=a+(XR-a)*i/120,y=f(x); if(isFinite(y)&&Math.abs(y)<1e4)ys.push(y);} ys.push(0); let ylo=M.min(ys),yhi=M.max(ys); let p=(yhi-ylo)*.15||1;
+        ch.setY(ylo-p,yhi+p); ch.clear(); ch.gridlines(niceTicks(ch.xmin,ch.xmax,6),niceTicks(ch.ymin,ch.ymax,5)); ch.axes();
+        ch.shade(f,a,t,hexA(COL.calc2,.22)); ch.curve(f,COL.calc1,2.2); ch.axisX(niceTicks(ch.xmin,ch.xmax,6)); ch.axisY(niceTicks(ch.ymin,ch.ymax,5)); ch.marker(a,'a',COL.coral); ch.marker(t,'t',COL.amber);
+        // bottom: I(t) vs t
+        const cb=bot.chart(); const TT=Math.max(60,t*1.5); cb.setX(a,a+TT);
+        const Is=[]; for(let i=0;i<=100;i++){ const tt=a+TT*i/100; Is.push(M.integrate(f,a,tt,200)); }
+        let ilo=Math.min(0,M.min(Is)),ihi=M.max(Is); let ip=(ihi-ilo)*.15||1; cb.setY(ilo-ip,ihi+ip); cb.clear();
+        cb.gridlines(niceTicks(cb.xmin,cb.xmax,6),niceTicks(cb.ymin,cb.ymax,5)); cb.axes(); cb.axisX(niceTicks(cb.xmin,cb.xmax,6)); cb.axisY(niceTicks(cb.ymin,cb.ymax,5));
+        cb.pline(Is.map((_,i)=>cb.X(a+TT*i/100)),Is.map(v=>cb.Y(v)),COL.calc2,2.4);
+        if(converges){ cb.line(a,lim.total,a+TT,lim.total,hexA(COL.coral,.6),1.5,[5,4]); }
+        cb.dot(t,M.integrate(f,a,t,400),COL.amber,4.5);
+      } else {
+        let a=aIn.get(), b=bIn.get(); if(b<a)[a,b]=[b,a]; const L=b-a;
+        const lim=singLimit(f,a,b); const converges=lim.converges, atA=lim.atA;
+        const eps=L*1e-4; const lo=atA?a+eps:a, hi=atA?b:b-eps;
+        const Ipartial=M.integrate(f,lo,hi,3000);
+        stats.set([{k:'[a, b]',v:`[${M.round(a,2)}, ${M.round(b,2)}]`},{k:'asymptote at',v:atA?'x = a':'x = b'},{k:'partial area',v:M.round(Ipartial,4),accent:1},{k:'as ε→0',v:converges?M.round(lim.total,4):'∞',accent:1}]);
+        verdict.innerHTML = converges
+          ? `<b style="color:${COL.calc2}">Converges</b> to ≈ ${M.round(lim.total,4)} even though f blows up at x = ${atA?'a':'b'}.`
+          : `<b style="color:${COL.coral}">Diverges.</b> The area piling up near the asymptote grows without bound.`;
+        verdict.style.borderLeftColor = converges?COL.calc2:COL.coral;
+        const ch=top.chart(); ch.setX(a-L*0.05,b+L*0.05);
+        let ys=[]; for(let i=3;i<=117;i++){ const x=a+L*i/120,y=f(x); if(isFinite(y)&&Math.abs(y)<1e3)ys.push(y);} ys.push(0); let ylo=M.min(ys),yhi=M.max(ys); let p=(yhi-ylo)*.15||1;
+        ch.setY(ylo-p,yhi+p); ch.clear(); ch.gridlines(niceTicks(ch.xmin,ch.xmax,6),niceTicks(ch.ymin,ch.ymax,5)); ch.axes();
+        ch.shade(f,lo,hi,hexA(COL.calc2,.22)); ch.curve(f,COL.calc1,2.2); ch.vline(atA?a:b,hexA(COL.coral,.7),1.6,[4,3]); ch.axisX(niceTicks(ch.xmin,ch.xmax,6)); ch.axisY(niceTicks(ch.ymin,ch.ymax,5));
+        // bottom: partial area as the endpoint approaches the asymptote
+        const cb=bot.chart(); cb.setX(a,b); const Is=[],xs=[];
+        for(let i=1;i<=100;i++){ const frac=i/101; let val; if(atA){ const s=a+L*(1-frac); xs.push(s); val=M.integrate(f,s,b,500); } else { const up=a+L*frac; xs.push(up); val=M.integrate(f,a,up,500); } Is.push(val); }
+        let fin2=Is.filter(isFinite); let ilo=Math.min(0,M.min(fin2)),ihi=M.max(fin2); if(!isFinite(ihi))ihi=1; let ip=(ihi-ilo)*.15||1; cb.setY(ilo-ip,ihi+ip); cb.clear();
+        cb.gridlines(niceTicks(cb.xmin,cb.xmax,6),niceTicks(cb.ymin,cb.ymax,5)); cb.axes(); cb.axisX(niceTicks(cb.xmin,cb.xmax,6)); cb.axisY(niceTicks(cb.ymin,cb.ymax,5));
+        cb.pline(xs.map(x=>cb.X(x)),Is.map(v=>cb.Y(v)),COL.calc2,2.4); cb.vline(atA?a:b,hexA(COL.coral,.6),1.4,[4,3]);
+        if(converges) cb.line(a,lim.total,b,lim.total,hexA(COL.coral,.6),1.5,[5,4]);
+      }
     }
     render();
   }
@@ -1367,6 +1715,13 @@ function renderCatalog(){
     const sec=document.createElement('section'); sec.className='section'; sec.id='sec-'+key; sec.style.setProperty('--cat',cat.color);
     const head=document.createElement('div'); head.className='sec-head';
     head.innerHTML=`<span class="num">${cat.n}</span><h2>${cat.name}</h2><span class="desc">${cat.desc}</span>`;
+    let enrich=null;
+    if(cat.facts&&cat.facts.length){ enrich=document.createElement('div'); enrich.className='enrich'; enrich.style.setProperty('--cat',cat.color);
+      let fi=Math.floor(Math.random()*cat.facts.length);
+      const paint=()=>{ const f=cat.facts[fi]; enrich.innerHTML=`<span class="etag">${f.t==='use'?'✦ Application':'✨ Did you know'}</span><span class="etext">${f.s}</span><button title="another">↻</button>`;
+        enrich.querySelector('button').onclick=()=>{ fi=(fi+1)%cat.facts.length; paint(); }; };
+      paint();
+    }
     const grid=document.createElement('div'); grid.className='grid'; grid.id='grid-'+key;
     items.forEach(ap=>{
       const dc=DIFF_CLASS[ap.diff||'intro']||'diff-intro';
@@ -1381,7 +1736,7 @@ function renderCatalog(){
         <svg class="go" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M13 6l6 6-6 6"/></svg>`;
       card.onclick=()=>goApplet(ap.id); grid.appendChild(card);
     });
-    sec.append(head,grid); root.appendChild(sec);
+    sec.append(head); if(enrich)sec.append(enrich); sec.append(grid); root.appendChild(sec);
   });
 }
 function filterCatalog(q){
