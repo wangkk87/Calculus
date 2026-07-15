@@ -8,6 +8,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
+<script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
 <style>
 :root{
   --paper:#F7FAFA;
@@ -414,6 +416,14 @@ const COL = {
   coral:'#F43F5E', amber:'#F59E0B', green:'#16A34A', cyan:'#06B6D4', rose:'#E11D48', slate:'#64748B'
 };
 function hexA(hex,a){ const n=parseInt(hex.slice(1),16); return `rgba(${(n>>16)&255},${(n>>8)&255},${n&255},${a})`; }
+/* render a LaTeX string into el using KaTeX, in \displaystyle mode by default */
+function renderMath(el,latex,display=true){
+  if(!el) return;
+  try{
+    if(typeof katex==='undefined') throw new Error('katex not loaded');
+    katex.render(latex,el,{throwOnError:false,displayMode:display});
+  }catch(e){ el.textContent=latex; }
+}
 
 class Chart{
   constructor(canvas,{m={t:16,r:16,b:34,l:46},cssH=null,zoom=null}={}){
@@ -683,6 +693,30 @@ const Sym = (function(){
       case '^': prec=3; s=str(tr.a,4)+'^'+str(tr.b,3,'r'); break; }
     const needP=prec<parent||(prec===parent&&side==='r'&&(parent===1||parent===2)&&(tr.k==='-'||tr.k==='/'));
     return needP?'('+s+')':s; }
+  /* LaTeX rendering, for use with KaTeX in displayMode (\displaystyle) */
+  function tex(tr,parent=0,side='l'){ let s,prec=4;
+    const TEXFN={sin:'\\sin',cos:'\\cos',tan:'\\tan',asin:'\\arcsin',acos:'\\arccos',atan:'\\arctan',sinh:'\\sinh',cosh:'\\cosh',tanh:'\\tanh',ln:'\\ln',log:'\\log',sec:'\\sec',csc:'\\csc',cot:'\\cot'};
+    switch(tr.k){
+      case 'n':{ let v=tr.v; s=(Math.abs(v-Math.round(v))<1e-10)?String(Math.round(v)):String(+v.toFixed(4)); if(v<0)prec=2; break; }
+      case 'v': s=tr.n; break;
+      case 'f': { const arg=tex(tr.a,0);
+        if(tr.n==='sqrt'){ s='\\sqrt{'+arg+'}'; }
+        else if(tr.n==='abs'){ s='\\left|'+arg+'\\right|'; }
+        else if(tr.n==='exp'){ s='e^{'+arg+'}'; prec=3; }
+        else if(tr.n==='log10'){ s='\\log_{10}\\left('+arg+'\\right)'; }
+        else if(TEXFN[tr.n]){ s=TEXFN[tr.n]+'\\left('+arg+'\\right)'; }
+        else { s='\\operatorname{'+tr.n+'}\\left('+arg+'\\right)'; }
+        break; }
+      case 'neg': prec=2; s='-'+tex(tr.a,2,'r'); break;
+      case '+': prec=1; s=tex(tr.a,1)+' + '+tex(tr.b,1,'r'); break;
+      case '-': prec=1; s=tex(tr.a,1)+' - '+tex(tr.b,1,'r'); break;
+      case '*': prec=2; s=tex(tr.a,2)+' \\cdot '+tex(tr.b,2,'r'); break;
+      case '/': s='\\frac{'+tex(tr.a,0)+'}{'+tex(tr.b,0)+'}'; break;
+      case '^': { const baseNeedsParen=['+','-','*','/','neg','^'].includes(tr.a.k);
+        const baseTex=baseNeedsParen?'\\left('+tex(tr.a,0)+'\\right)':tex(tr.a,0);
+        s=baseTex+'^{'+tex(tr.b,0)+'}'; prec=3; break; } }
+    const needP=prec<parent||(prec===parent&&side==='r'&&(parent===1||parent===2)&&(tr.k==='-'||tr.k==='/'));
+    return needP?'\\left('+s+'\\right)':s; }
   function integrateSimple(tr){ tr=simp(tr);
     if(tr.k==='n')return mul(tr,X());
     if(tr.k==='v'&&tr.n==='x')return div(pow(X(),N(2)),N(2));
@@ -695,7 +729,7 @@ const Sym = (function(){
     return null; }
   function compile(src, vars=['x']){ const lv=vars.map(v=>v.toLowerCase()); const t=parse((src||'').toLowerCase(), lv);
     return function(){ const args=arguments; const env={}; lv.forEach((v,i)=>env[v]=args[i]); return ev(t,env); }; }
-  return { parse, ev, diff, simp, str, integrateSimple, compile, N,V,X,add,sub,mul,div,pow,neg,fn };
+  return { parse, ev, diff, simp, str, tex, integrateSimple, compile, N,V,X,add,sub,mul,div,pow,neg,fn };
 })();
 
 function polyCoeffs(tree,maxDeg=8){ let c=[],d=tree,fact=1;
@@ -885,16 +919,145 @@ add({ id:'derivative-grapher', cat:'calc1', tag:'explore', title:'Graph of the D
       stats.set([{k:'x',v:M.round(x,2)},{k:'f(x)',v:M.round(fx,3)},{k:"f′(x) slope",v:M.round(dfx,3),accent:1},{k:'f″(x)',v:M.round(ddfx,3)},{k:'shape',v: dfx>0.02?'↗ rising':dfx<-0.02?'↘ falling':'→ flat'}]);
       const XL=-5,XR=5;
       // top
-      let ys=[]; for(let i=0;i<=80;i++){ const xx=XL+(XR-XL)*i/80,y=f(xx); if(isFinite(y)&&Math.abs(y)<200)ys.push(y);} let a=ys.length?M.min(ys):-5,bb=ys.length?M.max(ys):5; let p=(bb-a)*.12||1;
+      let ys=[]; for(let i=0;i<=80;i++){ const xx=XL+(XR-XL)*i/80,y=f(xx); if(isFinite(y)&&Math.abs(y)<200)ys.push(y);} let a=ys.length?M.min(ys):-5,bb=ys.length?M.max(ys):5; let p=padFor(a,bb);
       const ct=top.chart(); ct.setX(XL,XR).setY(a-p,bb+p); ct.clear(); ct.gridlines(niceTicks(XL,XR,6),niceTicks(a-p,bb+p,4)); ct.axes(); ct.axisX(niceTicks(XL,XR,6)); ct.axisY(niceTicks(a-p,bb+p,4));
       ct.curve(f,COL.calc1,2.4); ct.line(x-1.4,fx-dfx*1.4,x+1.4,fx+dfx*1.4,COL.coral,2); ct.dot(x,fx,COL.ink,5);
       // bottom
-      let dys=[]; for(let i=0;i<=80;i++){ const xx=XL+(XR-XL)*i/80,y=df(xx); if(isFinite(y)&&Math.abs(y)<200)dys.push(y);} let da=dys.length?M.min(dys):-5,db=dys.length?M.max(dys):5; let dp=(db-da)*.15||1;
+      let dys=[]; for(let i=0;i<=80;i++){ const xx=XL+(XR-XL)*i/80,y=df(xx); if(isFinite(y)&&Math.abs(y)<200)dys.push(y);} let da=dys.length?M.min(dys):-5,db=dys.length?M.max(dys):5; let dp=padFor(da,db);
       const cb=bot.chart(); cb.setX(XL,XR).setY(da-dp,db+dp); cb.clear(); cb.gridlines(niceTicks(XL,XR,6),niceTicks(da-dp,db+dp,4)); cb.axes(); cb.axisX(niceTicks(XL,XR,6)); cb.axisY(niceTicks(da-dp,db+dp,4));
       cb.curve(df,COL.calc2,2.4);
       if(show2.get()=='1') cb.curve(ddf,hexA(COL.calc3,.7),1.8,200);
       cb.dot(x,dfx,COL.coral,5); cb.line(XL,0,XR,0,hexA(COL.faint,.5),1,[3,3]);
     }
+    render();
+  }
+});
+
+/* ----- Implicit Differentiation & Tangent Lines (Ch 3.5) ----- */
+add({ id:'implicit-differentiation', cat:'calc1', tag:'type an equation', title:'Implicit Differentiation & Tangent Lines', diff:'adv', ch:'Ch 3.5',
+  questions:['Why differentiate both sides instead of solving for y first?','Every derivative of a y-term picks up a factor of dy/dx — why?','Where dy/dx comes out undefined, what does that look like on the curve?'],
+  blurb:'Type an equation in x and y — the curve doesn\u2019t have to be a function at all. Click anywhere on the curve to drop a point, and watch the tangent line and the exact slope dy/dx appear, worked out by implicit differentiation.',
+  build(host){
+    const eqIn=UI.text({label:'Equation in x and y',value:'x^3 + y^3 = 6*x*y',hint:'use * for every multiplication, e.g. 6*x*y (not 6xy);  try: x^3+y^3=6*x*y,  x^2+y^2=25,  x^2/9-y^2/4=1,  sin(x*y)=x'});
+    const err=document.createElement('div'); err.className='hint'; err.style.color=COL.coral; eqIn.appendChild(err);
+    const pxIn=UI.number({label:'point x',value:3,step:'any',onchange:()=>setPointFromInputs()});
+    const pyIn=UI.number({label:'point y',value:3,step:'any',onchange:()=>setPointFromInputs()});
+    const stats=UI.statsBox();
+    const sym=UI.formula('');
+    const plot=UI.plotCard('Click anywhere on the curve, or type a point below',420);
+    host.appendChild(UI.appGrid([eqIn,pxIn,pyIn,stats,sym,UI.note('This curve is <b>implicit</b> \u2014 it isn\u2019t written as y = f(x). Differentiate both sides with respect to x (each y-term picks up a factor of <b>dy/dx</b> by the chain rule), then solve algebraically for dy/dx. The exact result is shown above. <b>Click the curve</b>, or type a point\u2019s <b>x</b> and <b>y</b> above, to see the tangent line and the slope there \u2014 the point snaps to the nearest spot on the curve.')],[plot]));
+
+    let Gf=null,Gxf=null,Gyf=null,dydxTree=null,ready=false,picked=null;
+    const rng={xmin:-8,xmax:8,ymin:-8,ymax:8};
+
+    function compileEq(src){
+      ready=false;
+      try{
+        const s=(src||'').toLowerCase().replace(/\s+/g,'');
+        if(!s) throw new Error('empty equation');
+        const parts=s.split('=');
+        if(parts.length>2) throw new Error('only one "=" allowed');
+        const lhs=Sym.parse(parts[0],['x','y']);
+        const rhs=parts.length===2 ? Sym.parse(parts[1],['x','y']) : Sym.N(0);
+        const G=Sym.simp(Sym.sub(lhs,rhs));
+        const Gx=Sym.simp(Sym.diff(G,'x'));
+        const Gy=Sym.simp(Sym.diff(G,'y'));
+        dydxTree=Sym.simp(Sym.neg(Sym.div(Gx,Gy)));
+        Gf=(x,y)=>Sym.ev(G,{x,y}); Gxf=(x,y)=>Sym.ev(Gx,{x,y}); Gyf=(x,y)=>Sym.ev(Gy,{x,y});
+        const t0=Gf(0.31,0.47); if(typeof t0!=='number') throw new Error('could not evaluate');
+        err.textContent=''; eqIn.input.style.borderColor=''; ready=true; picked=null;
+      }catch(e){ err.textContent='\u26a0 '+e.message; eqIn.input.style.borderColor=COL.coral; ready=false; }
+    }
+
+    function projectOnCurve(x,y,iters=40){
+      let X=x,Y=y;
+      for(let k=0;k<iters;k++){
+        const g=Gf(X,Y); if(!isFinite(g)) return null;
+        const gx=Gxf(X,Y), gy=Gyf(X,Y), denom=gx*gx+gy*gy;
+        if(!isFinite(denom)||denom<1e-13) return null;
+        const t=g/denom; X-=t*gx; Y-=t*gy;
+        if(Math.abs(g)<1e-10) break;
+      }
+      return (isFinite(X)&&isFinite(Y)) ? [X,Y] : null;
+    }
+
+    function implicitSegments(xmin,xmax,ymin,ymax,nx,ny){
+      const dx=(xmax-xmin)/nx, dy=(ymax-ymin)/ny;
+      const val=new Float64Array((nx+1)*(ny+1));
+      for(let j=0;j<=ny;j++){ const y=ymin+j*dy; for(let i=0;i<=nx;i++){ const x=xmin+i*dx; val[j*(nx+1)+i]=Gf(x,y); } }
+      const v=(i,j)=>val[j*(nx+1)+i];
+      const segs=[];
+      function lerpEdge(va,vb,pa,pb){ const t=va/(va-vb); return [pa[0]+t*(pb[0]-pa[0]), pa[1]+t*(pb[1]-pa[1])]; }
+      for(let j=0;j<ny;j++)for(let i=0;i<nx;i++){
+        const x0=xmin+i*dx, x1=x0+dx, y0=ymin+j*dy, y1=y0+dy;
+        const v00=v(i,j), v10=v(i+1,j), v11=v(i+1,j+1), v01=v(i,j+1);
+        if(![v00,v10,v11,v01].every(isFinite)) continue;
+        const s00=v00>=0,s10=v10>=0,s11=v11>=0,s01=v01>=0;
+        const c=(s00?1:0)|(s10?2:0)|(s11?4:0)|(s01?8:0);
+        if(c===0||c===15) continue;
+        const B=()=>lerpEdge(v00,v10,[x0,y0],[x1,y0]), R=()=>lerpEdge(v10,v11,[x1,y0],[x1,y1]);
+        const T=()=>lerpEdge(v01,v11,[x0,y1],[x1,y1]), L=()=>lerpEdge(v00,v01,[x0,y0],[x0,y1]);
+        const push=(p1,p2)=>segs.push([p1,p2]);
+        switch(c){
+          case 1: push(L(),B()); break; case 2: push(B(),R()); break; case 3: push(L(),R()); break;
+          case 4: push(R(),T()); break; case 6: push(B(),T()); break; case 7: push(L(),T()); break;
+          case 8: push(L(),T()); break; case 9: push(B(),T()); break; case 11: push(R(),T()); break;
+          case 12: push(L(),R()); break; case 13: push(B(),R()); break; case 14: push(L(),B()); break;
+          case 5: { const cc=(v00+v10+v11+v01)/4; if((cc>=0)===(v00>=0)){ push(L(),B()); push(R(),T()); } else { push(L(),T()); push(B(),R()); } break; }
+          case 10:{ const cc=(v00+v10+v11+v01)/4; if((cc>=0)===(v10>=0)){ push(B(),R()); push(L(),T()); } else { push(L(),B()); push(R(),T()); } break; }
+        }
+      }
+      return segs;
+    }
+
+    plot.enableZoom(render);
+    plot.canvas.style.cursor='crosshair';
+    plot.canvas.addEventListener('click',e=>{
+      if(!ready) return;
+      const ch=plot.canvas._chart; if(!ch) return;
+      const r=plot.canvas.getBoundingClientRect();
+      const mx=ch.ix(e.clientX-r.left), my=ch.iy(e.clientY-r.top);
+      const p=projectOnCurve(mx,my);
+      if(p){ picked=p; pxIn.set(M.round(p[0],4)); pyIn.set(M.round(p[1],4)); render(); }
+    });
+    function setPointFromInputs(){
+      if(!ready) return;
+      const p=projectOnCurve(pxIn.get(),pyIn.get());
+      if(p){ picked=p; render(); }
+      else stats.set([{k:'note',v:'no curve point found near ('+M.round(pxIn.get(),3)+', '+M.round(pyIn.get(),3)+') \u2014 try a point closer to the curve'}]);
+    }
+
+    function render(){
+      const ch=plot.chart(); ch.setX(rng.xmin,rng.xmax).setY(rng.ymin,rng.ymax);
+      ch.clear();
+      if(!ready){ ch.gridlines(niceTicks(ch.xmin,ch.xmax,8),niceTicks(ch.ymin,ch.ymax,8)); ch.axes(); ch.axisX(niceTicks(ch.xmin,ch.xmax,8)); ch.axisY(niceTicks(ch.ymin,ch.ymax,8)); stats.set([]); sym.set(''); return; }
+      ch.gridlines(niceTicks(ch.xmin,ch.xmax,8),niceTicks(ch.ymin,ch.ymax,8)); ch.axes();
+      ch.axisX(niceTicks(ch.xmin,ch.xmax,8)); ch.axisY(niceTicks(ch.ymin,ch.ymax,8));
+      const segs=implicitSegments(ch.xmin,ch.xmax,ch.ymin,ch.ymax,130,110);
+      if(!picked&&segs.length){ const s=segs[Math.floor(segs.length/2)]; const mid=[(s[0][0]+s[1][0])/2,(s[0][1]+s[1][1])/2]; picked=projectOnCurve(mid[0],mid[1])||mid; pxIn.set(M.round(picked[0],4)); pyIn.set(M.round(picked[1],4)); }
+      ch.clip();
+      const ctx=ch.ctx; ctx.strokeStyle=COL.calc1; ctx.lineWidth=2.4; ctx.lineJoin='round'; ctx.beginPath();
+      segs.forEach(s=>{ ctx.moveTo(ch.X(s[0][0]),ch.Y(s[0][1])); ctx.lineTo(ch.X(s[1][0]),ch.Y(s[1][1])); }); ctx.stroke();
+      if(picked){
+        const[px,py]=picked, gx=Gxf(px,py), gy=Gyf(px,py), xr=ch.xmax-ch.xmin;
+        if(Math.abs(gy)>1e-9*Math.max(1,Math.abs(gx))){
+          const slope=-gx/gy;
+          ch.line(px-xr,py-slope*xr,px+xr,py+slope*xr,COL.optim,2.4);
+          stats.set([{k:'point',v:'('+M.round(px,3)+', '+M.round(py,3)+')'},{k:'dy/dx here',v:M.round(slope,4),accent:true}]);
+        } else {
+          ch.vline(px,COL.optim,2.4);
+          stats.set([{k:'point',v:'('+M.round(px,3)+', '+M.round(py,3)+')'},{k:'dy/dx here',v:'undefined (vertical tangent)',accent:true}]);
+        }
+      }
+      ch.unclip();
+      if(picked) ch.dot(picked[0],picked[1],COL.ink,5.5);
+      if(!segs.length) stats.set([{k:'note',v:'no curve in view \u2014 try a different equation or click Reset zoom'}]);
+      try{ renderMath(sym,'\\frac{dy}{dx} = '+Sym.tex(dydxTree),true); }catch(e){ sym.set(''); }
+    }
+
+    eqIn.input.addEventListener('input',()=>{ compileEq(eqIn.get()); render(); });
+    eqIn.input.addEventListener('change',()=>{ compileEq(eqIn.get()); render(); });
+    compileEq(eqIn.get());
     render();
   }
 });
