@@ -348,6 +348,15 @@ const M = {
 /* ---------- tiny safe math expression parser ----------
    Supports: + - * / ^ , parentheses, unary minus, variables,
    and named functions/constants. Compiles to a JS function. */
+/* Turn |...| absolute-value bar notation into abs(...) so both parsers below
+   (which only understand function-call syntax) can handle e.g. |x| or |x-1|.
+   Bars are paired left-to-right: 1st,3rd,5th... -> 'abs(', 2nd,4th,6th... -> ')'. */
+function convertAbsBars(s){
+  if(!s.includes('|')) return s;
+  let out='', open=false;
+  for(const ch of s){ if(ch==='|'){ out+= open?')':'abs('; open=!open; } else out+=ch; }
+  return out;
+}
 function compileExpr(src, vars){
   // Prefer the Sym parser (correct unary/^ precedence; handles -x^2, exp(-x^2)).
   try{ if(typeof Sym!=='undefined'){ const f=Sym.compile(src,vars); f(...vars.map(()=>0.137)); return f; } }catch(e){ /* fall back to legacy tokenizer below */ }
@@ -364,7 +373,7 @@ function compileExprLegacy(src, vars){
     atan2:'Math.atan2', pow:'Math.pow', min:'Math.min', max:'Math.max'
   };
   const consts = { pi:'Math.PI', e:'Math.E' };
-  let s = (src||'').toLowerCase().replace(/\s+/g,'');
+  let s = convertAbsBars((src||'').toLowerCase().replace(/\s+/g,''));
   if(!s) throw new Error('empty expression');
   // implicit multiplication: 2x -> 2*x , )( -> )*( , x( handled below carefully
   // tokenize
@@ -630,7 +639,7 @@ function makeFnInput(label,initial,vars,onok,hint){
 /* ===== Sym: tiny symbolic engine (parse → tree, eval, diff, simplify, print, compile) ===== */
 const Sym = (function(){
   const U1=['asin','acos','atan','sinh','cosh','tanh','sin','cos','tan','sec','csc','cot','exp','ln','log','log10','sqrt','abs','sign','floor','ceil','round'];
-  function tokenize(s){ const t=[]; let i=0; s=s.replace(/\s+/g,'');
+  function tokenize(s){ const t=[]; let i=0; s=convertAbsBars(s.replace(/\s+/g,''));
     while(i<s.length){ const c=s[i];
       if(/[0-9.]/.test(c)){ let j=i+1; while(j<s.length&&/[0-9.]/.test(s[j]))j++; t.push({t:'num',v:parseFloat(s.slice(i,j))}); i=j; }
       else if(/[a-zA-Z]/.test(c)){ let j=i+1; while(j<s.length&&/[a-zA-Z0-9]/.test(s[j]))j++; t.push({t:'id',v:s.slice(i,j)}); i=j; }
@@ -1094,7 +1103,7 @@ add({ id:'first-derivative-test', cat:'calc1', tag:'type a function', title:'Loc
       const f=fin.fn(); if(!f)return; const fp=x=>M.nderiv(f,x);
       const lo=-5,hi=5,N=600,h=(hi-lo)/N;
       const crit=[]; let prev=fp(lo);
-      for(let i=1;i<=N;i++){ const x=lo+i*h, cur=fp(x); if(isFinite(prev)&&isFinite(cur)){ if(prev*cur<0){ let a=x-h,b=x; for(let k=0;k<40;k++){ const m=(a+b)/2; (fp(a)*fp(m)<=0)?b=m:a=m; } const xc=(a+b)/2; crit.push({x:xc,y:f(xc),kind:fp(xc-0.01)>0?'max':'min'}); } else if(cur===0&&prev!==0){ crit.push({x:x,y:f(x),kind:fp(x-0.01)>0?'max':'min'}); } } prev=cur; }
+      for(let i=1;i<=N;i++){ const x=lo+i*h, cur=fp(x); if(isFinite(prev)&&isFinite(cur)){ if(prev*cur<0){ let a=x-h,b=x; for(let k=0;k<40;k++){ const m=(a+b)/2; (fp(a)*fp(m)<=0)?b=m:a=m; } const xc=(a+b)/2; crit.push({x:xc,y:f(xc),kind:fp(xc-0.01)>0?'max':'min'}); } else if(cur===0&&Math.abs(prev)>1e-6){ const nxt=fp(x+h); if(isFinite(nxt)&&(prev>0)!==(nxt>0)&&Math.abs(nxt)>1e-6){ crit.push({x:x,y:f(x),kind:fp(x-0.01)>0?'max':'min'}); } } } prev=cur; }
       let rows = crit.length? '' : 'No local max/min in [−5, 5] for this function.<br>';
       crit.forEach(c=>{ rows+='<b style="color:'+(c.kind==='max'?COL.optim:COL.calc2)+'">local '+c.kind+'</b> at x = '+M.round(c.x,3)+',  f = '+M.round(c.y,3)+'<br>'; });
       info.innerHTML=rows;
@@ -1117,36 +1126,55 @@ add({ id:'first-derivative-test', cat:'calc1', tag:'type a function', title:'Loc
 /* ----- Concavity & Inflection Points (Ch 4.3) ----- */
 add({ id:'concavity', cat:'calc1', tag:'type a function', title:'Concavity & Inflection Points', diff:'inter', ch:'Ch 4.3',
   questions:['“Concave up” holds water like a cup; “concave down” spills like a dome. Which way is your curve bending?','An inflection point is where it switches — what does the second derivative do there?','Can a curve be increasing the whole time yet still change concavity?'],
-  blurb:'Type a function. The tool shades where the curve is concave up vs concave down and marks the inflection points where it switches.',
+  blurb:'Type a function. The tool finds the critical numbers (from f′) and the inflection points (from f″), shows both formulas, and shades where the curve is concave up vs concave down.',
   build(host){
-    const fin=makeFnInput('Function f(x)','x^3 - 3*x',['x'],()=>render(),'try: x^3-3x,  x^4-6x^2,  sin(x)');
+    const fin=makeFnInput('Function f(x)','x^3 - 3*x',['x'],()=>render(),'try: x^3-3x,  x^4-6x^2,  sin(x),  |x|');
     const info=document.createElement('div'); info.className='formula'; info.style.lineHeight='1.9';
     const plot=UI.plotCard('blue = concave up · orange = concave down',330);
-    const d1=UI.plotCard('first derivative f′(x)',205);
-    const d2=UI.plotCard('second derivative f″(x): + = cup, − = dome, 0 = inflection',205);
-    host.appendChild(UI.appGrid([fin,UI.note('Concavity comes from the <b>second derivative</b>. Where f″ is positive the curve is <b>concave up</b> (a cup, blue); where negative, <b>concave down</b> (a dome, orange). Inflection points are where f″ = 0. Both f′ and f″ are drawn below so you can see the clues directly. Scroll any graph to zoom in or out.'),info],[plot,d1,d2]));
+    const d1f=UI.formula(''); const d1=UI.plotCard('first derivative f′(x)',205);
+    const d2f=UI.formula(''); const d2=UI.plotCard('second derivative f″(x): + = cup, − = dome, 0 = inflection',205);
+    host.appendChild(UI.appGrid([fin,UI.note('Concavity comes from the <b>second derivative</b>. Where f″ is positive the curve is <b>concave up</b> (a cup, blue); where negative, <b>concave down</b> (a dome, orange). Inflection points are where f″ = 0. Critical numbers (where f′ = 0) are marked too. Both f′ and f″ are drawn below, each zoomed to its own interesting region, so you can see the clues directly. Scroll any graph to zoom in or out.'),info],[plot,d1f,d1,d2f,d2]));
     plot.enableZoom(render); d1.enableZoom(render); d2.enableZoom(render);
-    function drawAux(card,g,color){
-      let yd=[]; for(let i=0;i<=120;i++){ const x=-5+10*i/120; const y=g(x); if(isFinite(y)&&Math.abs(y)<1e3)yd.push(y);} let glo=yd.length?M.min(yd):-3,ghi=yd.length?M.max(yd):3,gp=padFor(glo,ghi);
+    const HARD_FNS=['abs','sign','floor','ceil','round'];
+    function containsHardFn(tr){ if(!tr||typeof tr!=='object') return false; if(tr.k==='f'&&HARD_FNS.includes(tr.n)) return true; return containsHardFn(tr.a)||containsHardFn(tr.b); }
+    function symbolicDerivs(){
+      try{
+        const raw=(fin.get()||'').toLowerCase().replace(/\s+/g,'');
+        const tree=Sym.parse(raw,['x']);
+        if(containsHardFn(tree)) return null; // e.g. |x| — no single closed-form derivative through 0
+        const d1t=Sym.simp(Sym.diff(tree,'x'));
+        const d2t=Sym.simp(Sym.diff(d1t,'x'));
+        return { d1tex:Sym.tex(d1t), d2tex:Sym.tex(d2t) };
+      }catch(e){ return null; }
+    }
+    function drawAux(card,g,color,featureXs){
+      const [glo,ghi]=focusedYRange(g,-5,5,featureXs); const gp=padFor(glo,ghi);
       const c=card.chart(); c.setX(-5,5).setY(Math.min(0,glo)-gp,Math.max(0,ghi)+gp); c.clear(); c.gridlines(niceTicks(c.xmin,c.xmax,6),niceTicks(c.ymin,c.ymax,4)); c.axes(); c.axisX(niceTicks(c.xmin,c.xmax,6)); c.axisY(niceTicks(c.ymin,c.ymax,4)); c.clip(); c.curve(g,color,2.1); c.unclip(); return c; }
     function render(){
       const f=fin.fn(); if(!f)return; const fp=x=>M.nderiv(f,x), f2=x=>M.nderiv2(f,x);
       const lo=-5,hi=5,N=600,h=(hi-lo)/N;
+      const crit=[]; let prevP=fp(lo);
+      for(let i=1;i<=N;i++){ const x=lo+i*h, cur=fp(x); if(isFinite(prevP)&&isFinite(cur)){ if(prevP*cur<0){ let a=x-h,b=x; for(let k=0;k<40;k++){ const m=(a+b)/2; (fp(a)*fp(m)<=0)?b=m:a=m; } const xc=(a+b)/2; crit.push({x:xc,y:f(xc),kind:fp(xc-0.01)>0?'max':'min'}); } else if(cur===0&&prevP!==0){ crit.push({x:x,y:f(x),kind:fp(x-0.01)>0?'max':'min'}); } } prevP=cur; }
       const infl=[]; let prev=f2(lo);
-      for(let i=1;i<=N;i++){ const x=lo+i*h, cur=f2(x); if(isFinite(prev)&&isFinite(cur)){ if(prev*cur<0){ let a=x-h,b=x; for(let k=0;k<40;k++){ const m=(a+b)/2; (f2(a)*f2(m)<=0)?b=m:a=m; } const xc=(a+b)/2; infl.push({x:xc,y:f(xc)}); } else if(cur===0&&prev!==0){ infl.push({x:x,y:f(x)}); } } prev=cur; }
-      let rows= infl.length? '' : 'No inflection points in [−5, 5] for this function.<br>';
-      infl.forEach(c=>{ rows+='<b style="color:'+COL.calc3+'">inflection</b> at x = '+M.round(c.x,3)+',  f = '+M.round(c.y,3)+'<br>'; });
+      for(let i=1;i<=N;i++){ const x=lo+i*h, cur=f2(x); if(isFinite(prev)&&isFinite(cur)){ if(prev*cur<0){ let a=x-h,b=x; for(let k=0;k<40;k++){ const m=(a+b)/2; (f2(a)*f2(m)<=0)?b=m:a=m; } const xc=(a+b)/2; infl.push({x:xc,y:f(xc)}); } else if(cur===0&&Math.abs(prev)>1e-6){ const nxt=f2(x+h); if(isFinite(nxt)&&(prev>0)!==(nxt>0)&&Math.abs(nxt)>1e-6){ infl.push({x:x,y:f(x)}); } } } prev=cur; }
+      let rows = crit.length ? crit.map(c=>'<b style="color:'+(c.kind==='max'?COL.optim:COL.calc2)+'">local '+c.kind+'</b> at x = '+M.round(c.x,3)+',  f = '+M.round(c.y,3)+'<br>').join('') : 'No critical numbers in [−5, 5] for this function.<br>';
+      rows += infl.length ? infl.map(c=>'<b style="color:'+COL.calc3+'">inflection</b> at x = '+M.round(c.x,3)+',  f = '+M.round(c.y,3)+'<br>').join('') : 'No inflection points in [−5, 5] for this function.<br>';
       info.innerHTML=rows;
-      let [ylo,yhi]=focusedYRange(f,lo,hi,infl.map(c=>c.x)),pad=padFor(ylo,yhi);
+      const sd=symbolicDerivs();
+      if(sd){ renderMath(d1f, "f\\,'(x) = "+sd.d1tex, true); renderMath(d2f, "f\\,''(x) = "+sd.d2tex, true); }
+      else { d1f.set('<span style="color:'+COL.faint+';font-style:italic">f′(x) — no single closed form here (e.g. |x|); shown numerically only</span>'); d2f.set(''); }
+      let [ylo,yhi]=focusedYRange(f,lo,hi,[...crit.map(c=>c.x),...infl.map(c=>c.x)]),pad=padFor(ylo,yhi);
       const ch=plot.chart(); ch.setX(lo,hi).setY(ylo-pad,yhi+pad); ch.clear(); ch.gridlines(niceTicks(ch.xmin,ch.xmax,6),niceTicks(ch.ymin,ch.ymax,5)); ch.axes(); ch.axisX(niceTicks(ch.xmin,ch.xmax,6)); ch.axisY(niceTicks(ch.ymin,ch.ymax,5));
       ch.clip(); const ctx=ch.ctx; let pX=null,pY=null;
       for(let i=0;i<=N;i++){ const x=lo+i*h, y=f(x); if(!isFinite(y)){pX=null;continue;} const yc=M.clamp(y,ch.ymin-50,ch.ymax+50); const up=f2(x)>=0;
         if(pX!==null){ ctx.strokeStyle=up?COL.calc1:COL.optim; ctx.lineWidth=2.7; ctx.beginPath(); ctx.moveTo(ch.X(pX),ch.Y(pY)); ctx.lineTo(ch.X(x),ch.Y(yc)); ctx.stroke(); } pX=x; pY=yc; }
       ch.unclip();
+      crit.forEach(c=>ch.dot(c.x,c.y,c.kind==='max'?COL.optim:COL.calc2,6));
       infl.forEach(c=>ch.dot(c.x,c.y,COL.calc3,6));
-      drawAux(d1,fp,COL.deriv);
-      const dd=drawAux(d2,f2,COL.amber);
-      infl.forEach(c=>dd.dot(c.x,0,COL.calc3,5));
+      const d1c=drawAux(d1,fp,COL.deriv,crit.map(c=>c.x));
+      crit.forEach(c=>d1c.dot(c.x,0,c.kind==='max'?COL.optim:COL.calc2,5));
+      const d2c=drawAux(d2,f2,COL.amber,infl.map(c=>c.x));
+      infl.forEach(c=>d2c.dot(c.x,0,COL.calc3,5));
     }
     render();
   }
@@ -1168,9 +1196,9 @@ add({ id:'curve-sketcher', cat:'calc1', tag:'type a function', title:'Curve Sket
       const f=fin.fn(); if(!f)return; const fp=x=>M.nderiv(f,x), f2=x=>M.nderiv2(f,x);
       const lo=-5,hi=5,N=600,h=(hi-lo)/N;
       const crit=[]; let prev=fp(lo);
-      for(let i=1;i<=N;i++){ const x=lo+i*h, cur=fp(x); if(isFinite(prev)&&isFinite(cur)){ if(prev*cur<0){ let a=x-h,b=x; for(let k=0;k<40;k++){ const m=(a+b)/2; (fp(a)*fp(m)<=0)?b=m:a=m;} const xc=(a+b)/2; crit.push({x:xc,y:f(xc),kind:fp(xc-0.01)>0?'max':'min'}); } else if(cur===0&&prev!==0){ crit.push({x:x,y:f(x),kind:fp(x-0.01)>0?'max':'min'}); } } prev=cur; }
+      for(let i=1;i<=N;i++){ const x=lo+i*h, cur=fp(x); if(isFinite(prev)&&isFinite(cur)){ if(prev*cur<0){ let a=x-h,b=x; for(let k=0;k<40;k++){ const m=(a+b)/2; (fp(a)*fp(m)<=0)?b=m:a=m;} const xc=(a+b)/2; crit.push({x:xc,y:f(xc),kind:fp(xc-0.01)>0?'max':'min'}); } else if(cur===0&&Math.abs(prev)>1e-6){ const nxt=fp(x+h); if(isFinite(nxt)&&(prev>0)!==(nxt>0)&&Math.abs(nxt)>1e-6){ crit.push({x:x,y:f(x),kind:fp(x-0.01)>0?'max':'min'}); } } } prev=cur; }
       const infl=[]; let p2=f2(lo);
-      for(let i=1;i<=N;i++){ const x=lo+i*h, cur=f2(x); if(isFinite(p2)&&isFinite(cur)){ if(p2*cur<0){ let a=x-h,b=x; for(let k=0;k<40;k++){ const m=(a+b)/2; (f2(a)*f2(m)<=0)?b=m:a=m;} const xc=(a+b)/2; infl.push({x:xc,y:f(xc)}); } else if(cur===0&&p2!==0){ infl.push({x:x,y:f(x)}); } } p2=cur; }
+      for(let i=1;i<=N;i++){ const x=lo+i*h, cur=f2(x); if(isFinite(p2)&&isFinite(cur)){ if(p2*cur<0){ let a=x-h,b=x; for(let k=0;k<40;k++){ const m=(a+b)/2; (f2(a)*f2(m)<=0)?b=m:a=m;} const xc=(a+b)/2; infl.push({x:xc,y:f(xc)}); } else if(cur===0&&Math.abs(p2)>1e-6){ const nxt=f2(x+h); if(isFinite(nxt)&&(p2>0)!==(nxt>0)&&Math.abs(nxt)>1e-6){ infl.push({x:x,y:f(x)}); } } } p2=cur; }
       let rows='';
       rows += crit.length ? crit.map(c=>'<span style="color:'+(c.kind==='max'?COL.optim:COL.calc2)+'">local '+c.kind+'</span> ('+M.round(c.x,2)+', '+M.round(c.y,2)+')').join(' &nbsp; ')+'<br>' : 'no local max/min in view<br>';
       rows += infl.length ? infl.map(c=>'<span style="color:'+COL.calc3+'">inflection</span> ('+M.round(c.x,2)+', '+M.round(c.y,2)+')').join(' &nbsp; ') : 'no inflection points in view';
