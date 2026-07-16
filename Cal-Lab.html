@@ -1096,17 +1096,30 @@ add({ id:'first-derivative-test', cat:'calc1', tag:'type a function', title:'Loc
     const fin=makeFnInput('Function f(x)','x^3 - 3*x',['x'],()=>render(),'try: x^3-3x,  x^4-2x^2,  sin(x)');
     const info=document.createElement('div'); info.className='formula'; info.style.lineHeight='1.9';
     const plot=UI.plotCard('f(x): rising in green, falling in red',330);
-    const dplot=UI.plotCard('slope f′(x): crosses zero under each max/min',230);
-    host.appendChild(UI.appGrid([fin,UI.note('Green = <b>increasing</b> (slope +). Red = <b>decreasing</b> (slope −). Green→red is a <b>local max</b>; red→green a <b>local min</b> — the first-derivative test. The lower graph is f′(x); it <b>crosses zero</b> right under each max/min. Scroll on either graph to zoom in or out.'),info],[plot,dplot]));
+    const d1f=UI.formula(''); const dplot=UI.plotCard('slope f′(x): crosses zero under each max/min',230);
+    host.appendChild(UI.appGrid([fin,UI.note('Green = <b>increasing</b> (slope +). Red = <b>decreasing</b> (slope −). Green→red is a <b>local max</b>; red→green a <b>local min</b> — the first-derivative test. The lower graph is f′(x); it <b>crosses zero</b> right under each max/min. Scroll on either graph to zoom in or out.'),info],[plot,d1f,dplot]));
     plot.enableZoom(render); dplot.enableZoom(render);
+    const HARD_FNS=['abs','sign','floor','ceil','round'];
+    function containsHardFn(tr){ if(!tr||typeof tr!=='object') return false; if(tr.k==='f'&&HARD_FNS.includes(tr.n)) return true; return containsHardFn(tr.a)||containsHardFn(tr.b); }
+    function symbolicDeriv(){
+      try{
+        const raw=(fin.get()||'').toLowerCase().replace(/\s+/g,'');
+        const tree=Sym.parse(raw,['x']);
+        if(containsHardFn(tree)) return null;
+        return Sym.tex(Sym.simp(Sym.diff(tree,'x')));
+      }catch(e){ return null; }
+    }
     function render(){
       const f=fin.fn(); if(!f)return; const fp=x=>M.nderiv(f,x);
       const lo=-5,hi=5,N=600,h=(hi-lo)/N;
       const crit=[]; let prev=fp(lo);
-      for(let i=1;i<=N;i++){ const x=lo+i*h, cur=fp(x); if(isFinite(prev)&&isFinite(cur)){ if(prev*cur<0){ let a=x-h,b=x; for(let k=0;k<40;k++){ const m=(a+b)/2; (fp(a)*fp(m)<=0)?b=m:a=m; } const xc=(a+b)/2; crit.push({x:xc,y:f(xc),kind:fp(xc-0.01)>0?'max':'min'}); } else if(cur===0&&Math.abs(prev)>1e-6){ const nxt=fp(x+h); if(isFinite(nxt)&&(prev>0)!==(nxt>0)&&Math.abs(nxt)>1e-6){ crit.push({x:x,y:f(x),kind:fp(x-0.01)>0?'max':'min'}); } } } prev=cur; }
+      for(let i=1;i<=N;i++){ const x=lo+i*h, cur=fp(x); if(isFinite(prev)&&isFinite(cur)){ if(prev*cur<0&&(Math.abs(prev)>1e-6||Math.abs(cur)>1e-6)){ let a=x-h,b=x; for(let k=0;k<40;k++){ const m=(a+b)/2; (fp(a)*fp(m)<=0)?b=m:a=m; } const xc=(a+b)/2; crit.push({x:xc,y:f(xc),kind:fp(xc-0.01)>0?'max':'min'}); } else if(cur===0&&Math.abs(prev)>1e-6){ const nxt=fp(x+h); if(isFinite(nxt)&&(prev>0)!==(nxt>0)&&Math.abs(nxt)>1e-6){ crit.push({x:x,y:f(x),kind:fp(x-0.01)>0?'max':'min'}); } } } prev=cur; }
       let rows = crit.length? '' : 'No local max/min in [−5, 5] for this function.<br>';
       crit.forEach(c=>{ rows+='<b style="color:'+(c.kind==='max'?COL.optim:COL.calc2)+'">local '+c.kind+'</b> at x = '+M.round(c.x,3)+',  f = '+M.round(c.y,3)+'<br>'; });
       info.innerHTML=rows;
+      const d1tex=symbolicDeriv();
+      if(d1tex) renderMath(d1f, "f^{\\prime}(x) = "+d1tex, true);
+      else d1f.set('<span style="color:'+COL.faint+';font-style:italic">f′(x) — no single closed form here (e.g. |x|); shown numerically only</span>');
       let [ylo,yhi]=focusedYRange(f,lo,hi,crit.map(c=>c.x)),pad=padFor(ylo,yhi);
       const ch=plot.chart(); ch.setX(lo,hi).setY(ylo-pad,yhi+pad); ch.clear(); ch.gridlines(niceTicks(ch.xmin,ch.xmax,6),niceTicks(ch.ymin,ch.ymax,5)); ch.axes(); ch.axisX(niceTicks(ch.xmin,ch.xmax,6)); ch.axisY(niceTicks(ch.ymin,ch.ymax,5));
       ch.clip(); const ctx=ch.ctx; let pX=null,pY=null;
@@ -1114,7 +1127,7 @@ add({ id:'first-derivative-test', cat:'calc1', tag:'type a function', title:'Loc
         if(pX!==null){ ctx.strokeStyle=up?COL.calc2:COL.coral; ctx.lineWidth=2.7; ctx.beginPath(); ctx.moveTo(ch.X(pX),ch.Y(pY)); ctx.lineTo(ch.X(x),ch.Y(yc)); ctx.stroke(); } pX=x; pY=yc; }
       ch.unclip();
       crit.forEach(c=>ch.dot(c.x,c.y,c.kind==='max'?COL.optim:COL.calc2,6));
-      let yd=[]; for(let i=0;i<=120;i++){ const x=lo+(hi-lo)*i/120; const y=fp(x); if(isFinite(y)&&Math.abs(y)<1e3)yd.push(y);} let dlo=yd.length?M.min(yd):-3,dhi=yd.length?M.max(yd):3,dpad=padFor(dlo,dhi);
+      const [dlo,dhi]=focusedYRange(fp,lo,hi,crit.map(c=>c.x)), dpad=padFor(dlo,dhi);
       const dc=dplot.chart(); dc.setX(lo,hi).setY(Math.min(0,dlo)-dpad,Math.max(0,dhi)+dpad); dc.clear(); dc.gridlines(niceTicks(dc.xmin,dc.xmax,6),niceTicks(dc.ymin,dc.ymax,5)); dc.axes(); dc.axisX(niceTicks(dc.xmin,dc.xmax,6)); dc.axisY(niceTicks(dc.ymin,dc.ymax,5));
       dc.clip(); dc.curve(fp,COL.deriv,2.2); dc.unclip();
       crit.forEach(c=>dc.dot(c.x,0,c.kind==='max'?COL.optim:COL.calc2,5));
@@ -1154,14 +1167,14 @@ add({ id:'concavity', cat:'calc1', tag:'type a function', title:'Concavity & Inf
       const f=fin.fn(); if(!f)return; const fp=x=>M.nderiv(f,x), f2=x=>M.nderiv2(f,x);
       const lo=-5,hi=5,N=600,h=(hi-lo)/N;
       const crit=[]; let prevP=fp(lo);
-      for(let i=1;i<=N;i++){ const x=lo+i*h, cur=fp(x); if(isFinite(prevP)&&isFinite(cur)){ if(prevP*cur<0){ let a=x-h,b=x; for(let k=0;k<40;k++){ const m=(a+b)/2; (fp(a)*fp(m)<=0)?b=m:a=m; } const xc=(a+b)/2; crit.push({x:xc,y:f(xc),kind:fp(xc-0.01)>0?'max':'min'}); } else if(cur===0&&prevP!==0){ crit.push({x:x,y:f(x),kind:fp(x-0.01)>0?'max':'min'}); } } prevP=cur; }
+      for(let i=1;i<=N;i++){ const x=lo+i*h, cur=fp(x); if(isFinite(prevP)&&isFinite(cur)){ if(prevP*cur<0&&(Math.abs(prevP)>1e-6||Math.abs(cur)>1e-6)){ let a=x-h,b=x; for(let k=0;k<40;k++){ const m=(a+b)/2; (fp(a)*fp(m)<=0)?b=m:a=m; } const xc=(a+b)/2; crit.push({x:xc,y:f(xc),kind:fp(xc-0.01)>0?'max':'min'}); } else if(cur===0&&Math.abs(prevP)>1e-6){ const nxt=fp(x+h); if(isFinite(nxt)&&(prevP>0)!==(nxt>0)&&Math.abs(nxt)>1e-6){ crit.push({x:x,y:f(x),kind:fp(x-0.01)>0?'max':'min'}); } } } prevP=cur; }
       const infl=[]; let prev=f2(lo);
-      for(let i=1;i<=N;i++){ const x=lo+i*h, cur=f2(x); if(isFinite(prev)&&isFinite(cur)){ if(prev*cur<0){ let a=x-h,b=x; for(let k=0;k<40;k++){ const m=(a+b)/2; (f2(a)*f2(m)<=0)?b=m:a=m; } const xc=(a+b)/2; infl.push({x:xc,y:f(xc)}); } else if(cur===0&&Math.abs(prev)>1e-6){ const nxt=f2(x+h); if(isFinite(nxt)&&(prev>0)!==(nxt>0)&&Math.abs(nxt)>1e-6){ infl.push({x:x,y:f(x)}); } } } prev=cur; }
+      for(let i=1;i<=N;i++){ const x=lo+i*h, cur=f2(x); if(isFinite(prev)&&isFinite(cur)){ if(prev*cur<0&&(Math.abs(prev)>1e-6||Math.abs(cur)>1e-6)){ let a=x-h,b=x; for(let k=0;k<40;k++){ const m=(a+b)/2; (f2(a)*f2(m)<=0)?b=m:a=m; } const xc=(a+b)/2; infl.push({x:xc,y:f(xc)}); } else if(cur===0&&Math.abs(prev)>1e-6){ const nxt=f2(x+h); if(isFinite(nxt)&&(prev>0)!==(nxt>0)&&Math.abs(nxt)>1e-6){ infl.push({x:x,y:f(x)}); } } } prev=cur; }
       let rows = crit.length ? crit.map(c=>'<b style="color:'+(c.kind==='max'?COL.optim:COL.calc2)+'">local '+c.kind+'</b> at x = '+M.round(c.x,3)+',  f = '+M.round(c.y,3)+'<br>').join('') : 'No critical numbers in [−5, 5] for this function.<br>';
       rows += infl.length ? infl.map(c=>'<b style="color:'+COL.calc3+'">inflection</b> at x = '+M.round(c.x,3)+',  f = '+M.round(c.y,3)+'<br>').join('') : 'No inflection points in [−5, 5] for this function.<br>';
       info.innerHTML=rows;
       const sd=symbolicDerivs();
-      if(sd){ renderMath(d1f, "f\\,'(x) = "+sd.d1tex, true); renderMath(d2f, "f\\,''(x) = "+sd.d2tex, true); }
+      if(sd){ renderMath(d1f, "f^{\\prime}(x) = "+sd.d1tex, true); renderMath(d2f, "f^{\\prime\\prime}(x) = "+sd.d2tex, true); }
       else { d1f.set('<span style="color:'+COL.faint+';font-style:italic">f′(x) — no single closed form here (e.g. |x|); shown numerically only</span>'); d2f.set(''); }
       let [ylo,yhi]=focusedYRange(f,lo,hi,[...crit.map(c=>c.x),...infl.map(c=>c.x)]),pad=padFor(ylo,yhi);
       const ch=plot.chart(); ch.setX(lo,hi).setY(ylo-pad,yhi+pad); ch.clear(); ch.gridlines(niceTicks(ch.xmin,ch.xmax,6),niceTicks(ch.ymin,ch.ymax,5)); ch.axes(); ch.axisX(niceTicks(ch.xmin,ch.xmax,6)); ch.axisY(niceTicks(ch.ymin,ch.ymax,5));
@@ -1196,9 +1209,9 @@ add({ id:'curve-sketcher', cat:'calc1', tag:'type a function', title:'Curve Sket
       const f=fin.fn(); if(!f)return; const fp=x=>M.nderiv(f,x), f2=x=>M.nderiv2(f,x);
       const lo=-5,hi=5,N=600,h=(hi-lo)/N;
       const crit=[]; let prev=fp(lo);
-      for(let i=1;i<=N;i++){ const x=lo+i*h, cur=fp(x); if(isFinite(prev)&&isFinite(cur)){ if(prev*cur<0){ let a=x-h,b=x; for(let k=0;k<40;k++){ const m=(a+b)/2; (fp(a)*fp(m)<=0)?b=m:a=m;} const xc=(a+b)/2; crit.push({x:xc,y:f(xc),kind:fp(xc-0.01)>0?'max':'min'}); } else if(cur===0&&Math.abs(prev)>1e-6){ const nxt=fp(x+h); if(isFinite(nxt)&&(prev>0)!==(nxt>0)&&Math.abs(nxt)>1e-6){ crit.push({x:x,y:f(x),kind:fp(x-0.01)>0?'max':'min'}); } } } prev=cur; }
+      for(let i=1;i<=N;i++){ const x=lo+i*h, cur=fp(x); if(isFinite(prev)&&isFinite(cur)){ if(prev*cur<0&&(Math.abs(prev)>1e-6||Math.abs(cur)>1e-6)){ let a=x-h,b=x; for(let k=0;k<40;k++){ const m=(a+b)/2; (fp(a)*fp(m)<=0)?b=m:a=m;} const xc=(a+b)/2; crit.push({x:xc,y:f(xc),kind:fp(xc-0.01)>0?'max':'min'}); } else if(cur===0&&Math.abs(prev)>1e-6){ const nxt=fp(x+h); if(isFinite(nxt)&&(prev>0)!==(nxt>0)&&Math.abs(nxt)>1e-6){ crit.push({x:x,y:f(x),kind:fp(x-0.01)>0?'max':'min'}); } } } prev=cur; }
       const infl=[]; let p2=f2(lo);
-      for(let i=1;i<=N;i++){ const x=lo+i*h, cur=f2(x); if(isFinite(p2)&&isFinite(cur)){ if(p2*cur<0){ let a=x-h,b=x; for(let k=0;k<40;k++){ const m=(a+b)/2; (f2(a)*f2(m)<=0)?b=m:a=m;} const xc=(a+b)/2; infl.push({x:xc,y:f(xc)}); } else if(cur===0&&Math.abs(p2)>1e-6){ const nxt=f2(x+h); if(isFinite(nxt)&&(p2>0)!==(nxt>0)&&Math.abs(nxt)>1e-6){ infl.push({x:x,y:f(x)}); } } } p2=cur; }
+      for(let i=1;i<=N;i++){ const x=lo+i*h, cur=f2(x); if(isFinite(p2)&&isFinite(cur)){ if(p2*cur<0&&(Math.abs(p2)>1e-6||Math.abs(cur)>1e-6)){ let a=x-h,b=x; for(let k=0;k<40;k++){ const m=(a+b)/2; (f2(a)*f2(m)<=0)?b=m:a=m;} const xc=(a+b)/2; infl.push({x:xc,y:f(xc)}); } else if(cur===0&&Math.abs(p2)>1e-6){ const nxt=f2(x+h); if(isFinite(nxt)&&(p2>0)!==(nxt>0)&&Math.abs(nxt)>1e-6){ infl.push({x:x,y:f(x)}); } } } p2=cur; }
       let rows='';
       rows += crit.length ? crit.map(c=>'<span style="color:'+(c.kind==='max'?COL.optim:COL.calc2)+'">local '+c.kind+'</span> ('+M.round(c.x,2)+', '+M.round(c.y,2)+')').join(' &nbsp; ')+'<br>' : 'no local max/min in view<br>';
       rows += infl.length ? infl.map(c=>'<span style="color:'+COL.calc3+'">inflection</span> ('+M.round(c.x,2)+', '+M.round(c.y,2)+')').join(' &nbsp; ') : 'no inflection points in view';
