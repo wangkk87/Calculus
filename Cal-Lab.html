@@ -501,6 +501,19 @@ function niceTicks(min,max,n=6){ const span=max-min||1; const step0=span/n; cons
 // range is only floating-point noise (e.g. a perfectly flat/linear function).
 function padFor(lo,hi){ const range=hi-lo; const scale=Math.max(Math.abs(hi),Math.abs(lo),1);
   return (range>scale*1e-9) ? range*0.15 : scale*0.15; }
+// pick a y-range that keeps the curve's interesting local behavior (its critical
+// points / inflection points) visibly sized, instead of a range dictated by
+// wherever the function happens to be largest across the whole domain (e.g. a
+// cubic's fast growth near the edges of [-5,5], which would flatten the small
+// bump in the middle into an almost straight line).
+function focusedYRange(f,lo,hi,featureXs){
+  const cx=(lo+hi)/2, domHalf=(hi-lo)/2;
+  let half = (featureXs&&featureXs.length) ? Math.max(...featureXs.map(x=>Math.abs(x-cx)))*1.8 : domHalf;
+  half = M.clamp(half, domHalf*0.25, domHalf);
+  const fx0=Math.max(lo,cx-half), fx1=Math.min(hi,cx+half);
+  let ys=[]; for(let i=0;i<=120;i++){ const x=fx0+(fx1-fx0)*i/120; const y=f(x); if(isFinite(y)&&Math.abs(y)<1e3) ys.push(y); }
+  return ys.length ? [M.min(ys),M.max(ys)] : [-3,3];
+}
 /* ----------------------- (3) UI + REGISTRY -------------------------- */
 const CATS = {
   calc1:{name:'Calculus I',   color:COL.calc1, n:'01', desc:'Functions, limits, derivatives, and the integral. Chapters 1–5.',
@@ -1029,6 +1042,10 @@ add({ id:'implicit-differentiation', cat:'calc1', tag:'type an equation', title:
 
     function render(){
       const ch=plot.chart(); ch.setX(rng.xmin,rng.xmax).setY(rng.ymin,rng.ymax);
+      // keep 1 unit in x and 1 unit in y the same number of pixels, so circles look like circles, not ellipses
+      { const pxSpan=ch.px1-ch.px0, pySpan=ch.py0-ch.py1, uppx=(ch.xmax-ch.xmin)/pxSpan, uppy=(ch.ymax-ch.ymin)/pySpan;
+        if(uppx>uppy){ const cy=(ch.ymin+ch.ymax)/2, half=uppx*pySpan/2; ch.ymin=cy-half; ch.ymax=cy+half; }
+        else if(uppy>uppx){ const cx=(ch.xmin+ch.xmax)/2, half=uppy*pxSpan/2; ch.xmin=cx-half; ch.xmax=cx+half; } }
       ch.clear();
       if(!ready){ ch.gridlines(niceTicks(ch.xmin,ch.xmax,8),niceTicks(ch.ymin,ch.ymax,8)); ch.axes(); ch.axisX(niceTicks(ch.xmin,ch.xmax,8)); ch.axisY(niceTicks(ch.ymin,ch.ymax,8)); stats.set([]); sym.set(''); return; }
       ch.gridlines(niceTicks(ch.xmin,ch.xmax,8),niceTicks(ch.ymin,ch.ymax,8)); ch.axes();
@@ -1077,11 +1094,11 @@ add({ id:'first-derivative-test', cat:'calc1', tag:'type a function', title:'Loc
       const f=fin.fn(); if(!f)return; const fp=x=>M.nderiv(f,x);
       const lo=-5,hi=5,N=600,h=(hi-lo)/N;
       const crit=[]; let prev=fp(lo);
-      for(let i=1;i<=N;i++){ const x=lo+i*h, cur=fp(x); if(isFinite(prev)&&isFinite(cur)&&prev*cur<0){ let a=x-h,b=x; for(let k=0;k<40;k++){ const m=(a+b)/2; (fp(a)*fp(m)<=0)?b=m:a=m; } const xc=(a+b)/2; crit.push({x:xc,y:f(xc),kind:fp(xc-0.01)>0?'max':'min'}); } prev=cur; }
+      for(let i=1;i<=N;i++){ const x=lo+i*h, cur=fp(x); if(isFinite(prev)&&isFinite(cur)){ if(prev*cur<0){ let a=x-h,b=x; for(let k=0;k<40;k++){ const m=(a+b)/2; (fp(a)*fp(m)<=0)?b=m:a=m; } const xc=(a+b)/2; crit.push({x:xc,y:f(xc),kind:fp(xc-0.01)>0?'max':'min'}); } else if(cur===0&&prev!==0){ crit.push({x:x,y:f(x),kind:fp(x-0.01)>0?'max':'min'}); } } prev=cur; }
       let rows = crit.length? '' : 'No local max/min in [−5, 5] for this function.<br>';
       crit.forEach(c=>{ rows+='<b style="color:'+(c.kind==='max'?COL.optim:COL.calc2)+'">local '+c.kind+'</b> at x = '+M.round(c.x,3)+',  f = '+M.round(c.y,3)+'<br>'; });
       info.innerHTML=rows;
-      let ys=[]; for(let i=0;i<=120;i++){ const x=lo+(hi-lo)*i/120; const y=f(x); if(isFinite(y)&&Math.abs(y)<1e3)ys.push(y);} let ylo=ys.length?M.min(ys):-3,yhi=ys.length?M.max(ys):3,pad=padFor(ylo,yhi);
+      let [ylo,yhi]=focusedYRange(f,lo,hi,crit.map(c=>c.x)),pad=padFor(ylo,yhi);
       const ch=plot.chart(); ch.setX(lo,hi).setY(ylo-pad,yhi+pad); ch.clear(); ch.gridlines(niceTicks(ch.xmin,ch.xmax,6),niceTicks(ch.ymin,ch.ymax,5)); ch.axes(); ch.axisX(niceTicks(ch.xmin,ch.xmax,6)); ch.axisY(niceTicks(ch.ymin,ch.ymax,5));
       ch.clip(); const ctx=ch.ctx; let pX=null,pY=null;
       for(let i=0;i<=N;i++){ const x=lo+i*h, y=f(x); if(!isFinite(y)){pX=null;continue;} const yc=M.clamp(y,ch.ymin-50,ch.ymax+50); const up=fp(x)>=0;
@@ -1116,11 +1133,11 @@ add({ id:'concavity', cat:'calc1', tag:'type a function', title:'Concavity & Inf
       const f=fin.fn(); if(!f)return; const fp=x=>M.nderiv(f,x), f2=x=>M.nderiv2(f,x);
       const lo=-5,hi=5,N=600,h=(hi-lo)/N;
       const infl=[]; let prev=f2(lo);
-      for(let i=1;i<=N;i++){ const x=lo+i*h, cur=f2(x); if(isFinite(prev)&&isFinite(cur)&&prev*cur<0){ let a=x-h,b=x; for(let k=0;k<40;k++){ const m=(a+b)/2; (f2(a)*f2(m)<=0)?b=m:a=m; } const xc=(a+b)/2; infl.push({x:xc,y:f(xc)}); } prev=cur; }
+      for(let i=1;i<=N;i++){ const x=lo+i*h, cur=f2(x); if(isFinite(prev)&&isFinite(cur)){ if(prev*cur<0){ let a=x-h,b=x; for(let k=0;k<40;k++){ const m=(a+b)/2; (f2(a)*f2(m)<=0)?b=m:a=m; } const xc=(a+b)/2; infl.push({x:xc,y:f(xc)}); } else if(cur===0&&prev!==0){ infl.push({x:x,y:f(x)}); } } prev=cur; }
       let rows= infl.length? '' : 'No inflection points in [−5, 5] for this function.<br>';
       infl.forEach(c=>{ rows+='<b style="color:'+COL.calc3+'">inflection</b> at x = '+M.round(c.x,3)+',  f = '+M.round(c.y,3)+'<br>'; });
       info.innerHTML=rows;
-      let ys=[]; for(let i=0;i<=120;i++){ const x=lo+(hi-lo)*i/120; const y=f(x); if(isFinite(y)&&Math.abs(y)<1e3)ys.push(y);} let ylo=ys.length?M.min(ys):-3,yhi=ys.length?M.max(ys):3,pad=padFor(ylo,yhi);
+      let [ylo,yhi]=focusedYRange(f,lo,hi,infl.map(c=>c.x)),pad=padFor(ylo,yhi);
       const ch=plot.chart(); ch.setX(lo,hi).setY(ylo-pad,yhi+pad); ch.clear(); ch.gridlines(niceTicks(ch.xmin,ch.xmax,6),niceTicks(ch.ymin,ch.ymax,5)); ch.axes(); ch.axisX(niceTicks(ch.xmin,ch.xmax,6)); ch.axisY(niceTicks(ch.ymin,ch.ymax,5));
       ch.clip(); const ctx=ch.ctx; let pX=null,pY=null;
       for(let i=0;i<=N;i++){ const x=lo+i*h, y=f(x); if(!isFinite(y)){pX=null;continue;} const yc=M.clamp(y,ch.ymin-50,ch.ymax+50); const up=f2(x)>=0;
@@ -1151,14 +1168,14 @@ add({ id:'curve-sketcher', cat:'calc1', tag:'type a function', title:'Curve Sket
       const f=fin.fn(); if(!f)return; const fp=x=>M.nderiv(f,x), f2=x=>M.nderiv2(f,x);
       const lo=-5,hi=5,N=600,h=(hi-lo)/N;
       const crit=[]; let prev=fp(lo);
-      for(let i=1;i<=N;i++){ const x=lo+i*h, cur=fp(x); if(isFinite(prev)&&isFinite(cur)&&prev*cur<0){ let a=x-h,b=x; for(let k=0;k<40;k++){ const m=(a+b)/2; (fp(a)*fp(m)<=0)?b=m:a=m;} const xc=(a+b)/2; crit.push({x:xc,y:f(xc),kind:fp(xc-0.01)>0?'max':'min'}); } prev=cur; }
+      for(let i=1;i<=N;i++){ const x=lo+i*h, cur=fp(x); if(isFinite(prev)&&isFinite(cur)){ if(prev*cur<0){ let a=x-h,b=x; for(let k=0;k<40;k++){ const m=(a+b)/2; (fp(a)*fp(m)<=0)?b=m:a=m;} const xc=(a+b)/2; crit.push({x:xc,y:f(xc),kind:fp(xc-0.01)>0?'max':'min'}); } else if(cur===0&&prev!==0){ crit.push({x:x,y:f(x),kind:fp(x-0.01)>0?'max':'min'}); } } prev=cur; }
       const infl=[]; let p2=f2(lo);
-      for(let i=1;i<=N;i++){ const x=lo+i*h, cur=f2(x); if(isFinite(p2)&&isFinite(cur)&&p2*cur<0){ let a=x-h,b=x; for(let k=0;k<40;k++){ const m=(a+b)/2; (f2(a)*f2(m)<=0)?b=m:a=m;} const xc=(a+b)/2; infl.push({x:xc,y:f(xc)}); } p2=cur; }
+      for(let i=1;i<=N;i++){ const x=lo+i*h, cur=f2(x); if(isFinite(p2)&&isFinite(cur)){ if(p2*cur<0){ let a=x-h,b=x; for(let k=0;k<40;k++){ const m=(a+b)/2; (f2(a)*f2(m)<=0)?b=m:a=m;} const xc=(a+b)/2; infl.push({x:xc,y:f(xc)}); } else if(cur===0&&p2!==0){ infl.push({x:x,y:f(x)}); } } p2=cur; }
       let rows='';
       rows += crit.length ? crit.map(c=>'<span style="color:'+(c.kind==='max'?COL.optim:COL.calc2)+'">local '+c.kind+'</span> ('+M.round(c.x,2)+', '+M.round(c.y,2)+')').join(' &nbsp; ')+'<br>' : 'no local max/min in view<br>';
       rows += infl.length ? infl.map(c=>'<span style="color:'+COL.calc3+'">inflection</span> ('+M.round(c.x,2)+', '+M.round(c.y,2)+')').join(' &nbsp; ') : 'no inflection points in view';
       info.innerHTML=rows;
-      let ys=[]; for(let i=0;i<=120;i++){ const x=lo+(hi-lo)*i/120; const y=f(x); if(isFinite(y)&&Math.abs(y)<1e3)ys.push(y);} let ylo=ys.length?M.min(ys):-3,yhi=ys.length?M.max(ys):3,pad=(yhi-ylo)*.18||1;
+      let [ylo,yhi]=focusedYRange(f,lo,hi,[...crit.map(c=>c.x),...infl.map(c=>c.x)]),pad=(yhi-ylo)*.18||1;
       const ch=plot.chart(); ch.setX(lo,hi).setY(ylo-pad,yhi+pad); ch.clear(); ch.gridlines(niceTicks(ch.xmin,ch.xmax,6),niceTicks(ch.ymin,ch.ymax,5)); ch.axes(); ch.axisX(niceTicks(ch.xmin,ch.xmax,6)); ch.axisY(niceTicks(ch.ymin,ch.ymax,5));
       ch.clip();
       if(showD1.get()==='1') ch.curve(fp,hexA(COL.deriv,.6),1.6);
