@@ -767,6 +767,590 @@ function polyRealRoots(coeffs){ const n=coeffs.length-1; if(n<1)return []; const
   return z.filter(r=>Math.abs(r.im)<1e-5).map(r=>r.re).sort((p,q)=>p-q); }
 
 
+
+/* ===== rational-function analysis engine (asymptotes, exact derivatives, framing) ===== */
+
+/* =====================================================================
+   RatCAS — small computer-algebra helper for rational functions:
+   exact simplified derivatives (factored form) + exact vertical/
+   horizontal asymptotes, used by the "type a function" Calc I tools.
+   ===================================================================== */
+const Rat = (function(){
+  function trim(c){ c=c.slice(); while(c.length>1 && Math.abs(c[c.length-1])<1e-8) c.pop(); return c; }
+  function padd(a,b){ const n=Math.max(a.length,b.length),r=[]; for(let i=0;i<n;i++) r.push((a[i]||0)+(b[i]||0)); return trim(r); }
+  function psub(a,b){ const n=Math.max(a.length,b.length),r=[]; for(let i=0;i<n;i++) r.push((a[i]||0)-(b[i]||0)); return trim(r); }
+  function pmul(a,b){ const r=new Array(a.length+b.length-1).fill(0); for(let i=0;i<a.length;i++)for(let j=0;j<b.length;j++) r[i+j]+=a[i]*b[j]; return trim(r); }
+  function pscale(a,k){ return trim(a.map(v=>v*k)); }
+  function pdeg(a){ return trim(a).length-1; }
+  function peval(a,x){ let r=0; for(let i=a.length-1;i>=0;i--) r=r*x+a[i]; return r; }
+  function pIsZero(a){ a=trim(a); return a.length===1 && Math.abs(a[0])<1e-8; }
+  function pdivmod(a,b){
+    a=trim(a); b=trim(b); let rem=a.slice();
+    const db=pdeg(b), lb=b[db];
+    let q=new Array(Math.max(0,pdeg(a)-db+1)).fill(0);
+    while(!pIsZero(rem) && pdeg(rem)>=db){
+      const dr=pdeg(rem), lr=rem[dr];
+      const k=dr-db, coeff=lr/lb;
+      q[k]=coeff;
+      const sub=new Array(k).fill(0).concat(b.map(v=>v*coeff));
+      rem=psub(rem,sub);
+    }
+    return {q:trim(q), r:trim(rem)};
+  }
+  function pgcd(a,b){
+    a=trim(a); b=trim(b);
+    if(pIsZero(a)) return b; if(pIsZero(b)) return a;
+    let A=a,B=b, iter=0;
+    while(!pIsZero(B) && iter<60){ const {r}=pdivmod(A,B); A=B; B=trim(r); iter++; }
+    const lc=A[A.length-1];
+    return Math.abs(lc)>1e-12 ? A.map(v=>v/lc) : A;
+  }
+  function pow(a,e){ let r=[1]; for(let i=0;i<e;i++) r=pmul(r,a); return r; }
+  function pdiff(c){ c=trim(c); const r=[]; for(let i=1;i<c.length;i++) r.push(i*c[i]); return r.length?trim(r):[0]; }
+
+  // convert a Sym tree (pure rational-function ops) into {num,den} poly coeff arrays, or null
+  function toRat(tr){
+    switch(tr.k){
+      case 'n': return {num:[tr.v], den:[1]};
+      case 'v': return tr.n==='x' ? {num:[0,1], den:[1]} : null;
+      case 'neg': { const a=toRat(tr.a); if(!a) return null; return {num:pscale(a.num,-1), den:a.den}; }
+      case '+': { const a=toRat(tr.a), b=toRat(tr.b); if(!a||!b) return null; return {num:padd(pmul(a.num,b.den),pmul(b.num,a.den)), den:pmul(a.den,b.den)}; }
+      case '-': { const a=toRat(tr.a), b=toRat(tr.b); if(!a||!b) return null; return {num:psub(pmul(a.num,b.den),pmul(b.num,a.den)), den:pmul(a.den,b.den)}; }
+      case '*': { const a=toRat(tr.a), b=toRat(tr.b); if(!a||!b) return null; return {num:pmul(a.num,b.num), den:pmul(a.den,b.den)}; }
+      case '/': { const a=toRat(tr.a), b=toRat(tr.b); if(!a||!b) return null; return {num:pmul(a.num,b.den), den:pmul(a.den,b.num)}; }
+      case '^': {
+        if(tr.b.k!=='n' || Math.abs(tr.b.v-Math.round(tr.b.v))>1e-9) return null;
+        const e=Math.round(tr.b.v); const a=toRat(tr.a); if(!a) return null;
+        if(e===0) return {num:[1],den:[1]};
+        if(e>0) return {num:pow(a.num,e), den:pow(a.den,e)};
+        return {num:pow(a.den,-e), den:pow(a.num,-e)};
+      }
+      case 'f': return null; // transcendental — not a pure rational function
+      default: return null;
+    }
+  }
+  function simplify(rat){
+    let {num,den}=rat; num=trim(num); den=trim(den);
+    const g=pgcd(num,den);
+    if(pdeg(g)>0){ num=pdivmod(num,g).q; den=pdivmod(den,g).q; }
+    if(den[den.length-1]<0){ num=pscale(num,-1); den=pscale(den,-1); }
+    return {num,den};
+  }
+  function squarefreeKernel(p){
+    p=trim(p);
+    if(pdeg(p)<=1) return p;
+    const d=pgcd(p,pdiff(p));
+    if(pdeg(d)<=0) return p;
+    return trim(pdivmod(p,d).q);
+  }
+  function findMultiplicity(coeffs,r,maxM){
+    let cur=coeffs, m=0; const scale=Math.max(1,Math.abs(r));
+    while(m<maxM && pdeg(cur)>=0){
+      const val=peval(cur,r);
+      const cmag=Math.max(...cur.map(v=>Math.abs(v)),1e-9);
+      if(Math.abs(val) > 1e-5*cmag*Math.max(1,scale**Math.max(0,pdeg(cur)))) break;
+      cur=pdiff(cur); m++;
+      if(pdeg(cur)<0) break;
+    }
+    return Math.max(m,1);
+  }
+  function realRootsNumeric(coeffs){
+    const c=trim(coeffs); const n=c.length-1; if(n<1) return [];
+    const lead=c[n]; const a=c.map(v=>v/lead);
+    const P=z=>{ let re=0,im=0; for(let k=n;k>=0;k--){ const nre=re*z.re-im*z.im+a[k], nim=re*z.im+im*z.re; re=nre;im=nim; } return {re,im}; };
+    let z=[]; for(let i=0;i<n;i++){ const ang=2*Math.PI*i/n+0.5; z.push({re:0.7*Math.cos(ang),im:0.7*Math.sin(ang)}); }
+    for(let it=0;it<500;it++){ let md=0;
+      for(let i=0;i<n;i++){ const pz=P(z[i]); let dre=1,dim=0;
+        for(let j=0;j<n;j++){ if(j===i) continue; const rre=z[i].re-z[j].re,rim=z[i].im-z[j].im,nre=dre*rre-dim*rim,nim=dre*rim+dim*rre; dre=nre;dim=nim; }
+        const den=dre*dre+dim*dim||1e-14; const qre=(pz.re*dre+pz.im*dim)/den, qim=(pz.im*dre-pz.re*dim)/den;
+        z[i]={re:z[i].re-qre,im:z[i].im-qim}; md=Math.max(md,Math.hypot(qre,qim));
+      }
+      if(md<1e-13) break;
+    }
+    return z.map(r=>({re:r.re,im:r.im}));
+  }
+  function distinctRealRoots(poly){
+    poly=trim(poly); if(pdeg(poly)<1) return [];
+    const kernel=squarefreeKernel(poly);
+    const roots=realRootsNumeric(kernel);
+    const reals=roots.filter(r=>Math.abs(r.im)<1e-4*Math.max(1,Math.abs(r.re))+1e-5).map(r=>r.re);
+    reals.sort((a,b)=>a-b);
+    const out=[]; for(const r of reals){ if(!out.length || Math.abs(r-out[out.length-1])>1e-4*Math.max(1,Math.abs(r))+1e-4) out.push(r); }
+    return out;
+  }
+  function complexFactorMultiplicity(poly, quad, maxM){
+    let cur=trim(poly), m=0;
+    while(m<maxM && pdeg(cur)>=2){
+      const {q,r}=pdivmod(cur, quad);
+      const rmag=Math.max(...r.map(v=>Math.abs(v)),0);
+      const cmag=Math.max(...cur.map(v=>Math.abs(v)),1e-9);
+      if(rmag > 1e-4*cmag) break;
+      cur=q; m++;
+    }
+    return m;
+  }
+  return { trim, padd, psub, pmul, pscale, pdeg, peval, pdivmod, pgcd, pow, pdiff,
+    toRat, simplify, squarefreeKernel, findMultiplicity, realRootsNumeric, distinctRealRoots, complexFactorMultiplicity };
+})();
+
+function ratRootTexAbs(v){ // v assumed >=0; format as integer, small fraction, sqrt(n), or decimal fallback
+  if(Math.abs(v-Math.round(v))<1e-6) return String(Math.round(v));
+  for(let den=2; den<=12; den++){ const num=v*den; if(Math.abs(num-Math.round(num))<1e-6) return `\\frac{${Math.round(num)}}{${den}}`; }
+  const sq=v*v, sqn=Math.round(sq);
+  if(Math.abs(sqn-sq)<1e-6*Math.max(1,sq) && sqn>0 && Math.abs(Math.sqrt(sqn)-Math.round(Math.sqrt(sqn)))>1e-6) return `\\sqrt{${sqn}}`;
+  return String(Math.round(v*1e4)/1e4);
+}
+function ratNiceNum(v){
+  if(Math.abs(v-Math.round(v))<1e-6) return Math.round(v);
+  for(let den=2; den<=12; den++){ const num=v*den; if(Math.abs(num-Math.round(num))<1e-6) return Math.round(num)/den; }
+  return Math.round(v*1e4)/1e4;
+}
+function ratQuadTexScaled(re,im){
+  const b0=-2*re, c0=re*re+im*im;
+  let k=1;
+  for(let cand=1; cand<=12; cand++){
+    const bb=b0*cand, cc=c0*cand;
+    if(Math.abs(bb-Math.round(bb))<1e-5*cand+1e-6 && Math.abs(cc-Math.round(cc))<1e-5*cand+1e-6){ k=cand; break; }
+  }
+  const a=ratNiceNum(k), b=ratNiceNum(b0*k), c=ratNiceNum(c0*k);
+  let s=(Math.abs(a-1)<1e-9)?'x^{2}':`${a}x^{2}`;
+  if(Math.abs(b)>1e-9) s += (b>0?` + ${b}x`:` - ${Math.abs(b)}x`);
+  if(Math.abs(c)>1e-9) s += (c>0?` + ${c}`:` - ${Math.abs(c)}`);
+  return { tex:`(${s})`, scale:k };
+}
+function ratPolyToTex(coeffs){
+  coeffs=Rat.trim(coeffs); let s='';
+  for(let i=coeffs.length-1;i>=0;i--){
+    let c=coeffs[i]; if(Math.abs(c)<1e-9) continue;
+    const av=ratNiceNum(Math.abs(c));
+    const sign = c<0 ? ' - ' : (s? ' + ' : '');
+    let term;
+    if(i===0) term=`${av}`; else if(i===1) term=(av===1?'x':`${av}x`); else term=(av===1?`x^{${i}}`:`${av}x^{${i}}`);
+    s+=sign+term;
+  }
+  return s||'0';
+}
+function ratFactorToTex(coeffsIn){
+  let coeffs=Rat.trim(coeffsIn);
+  const n=Rat.pdeg(coeffs);
+  if(n<=0) return String(ratNiceNum(coeffs[0]||0));
+  const kernel=Rat.squarefreeKernel(coeffs);
+  const kroots=Rat.realRootsNumeric(kernel);
+  const realRoots=kroots.filter(r=>Math.abs(r.im)<1e-4*Math.max(1,Math.abs(r.re))+1e-5).map(r=>r.re);
+  realRoots.sort((a,b)=>a-b);
+  const clusters=[];
+  for(const r of realRoots){
+    const last=clusters[clusters.length-1];
+    if(last && Math.abs(r-last.r)<1e-4*Math.max(1,Math.abs(r))+1e-4) continue;
+    clusters.push({r, m:Rat.findMultiplicity(coeffs,r,n)});
+  }
+  const totalRealDeg=clusters.reduce((s,c)=>s+c.m,0);
+  const complexRoots=kroots.filter(r=>r.im>1e-6);
+  const lead0=coeffs[coeffs.length-1];
+  let leftover=coeffs.slice();
+  clusters.forEach(c=>{ const lin=[-c.r,1]; for(let i=0;i<c.m;i++) leftover=Rat.pdivmod(leftover,lin).q; });
+  const quadParts=[]; let quadDeg=0;
+  for(const cr of complexRoots){
+    const quad=[cr.re*cr.re+cr.im*cr.im, -2*cr.re, 1];
+    const m=Rat.complexFactorMultiplicity(leftover, quad, n);
+    if(m>0){ quadParts.push({re:cr.re,im:cr.im,m}); quadDeg+=2*m; for(let i=0;i<m;i++) leftover=Rat.pdivmod(leftover,quad).q; }
+  }
+  if(totalRealDeg+quadDeg===n){
+    let constant=lead0; const parts=[];
+    clusters.forEach(c=>{
+      const r=c.r; let factor;
+      if(Math.abs(r)<1e-7) factor='x';
+      else if(r>0) factor=`(x - ${ratRootTexAbs(r)})`;
+      else factor=`(x + ${ratRootTexAbs(-r)})`;
+      parts.push(c.m===1?factor:`${factor}^{${c.m}}`);
+    });
+    quadParts.forEach(q=>{
+      const {tex:qt,scale}=ratQuadTexScaled(q.re,q.im);
+      parts.push(q.m===1?qt:`${qt}^{${q.m}}`);
+      constant/=Math.pow(scale,q.m);
+    });
+    const cRound=ratNiceNum(constant);
+    let head=(Math.abs(cRound-1)<1e-9)?'':(Math.abs(cRound+1)<1e-9?'-':`${cRound}`);
+    return (head+parts.join(''))||'1';
+  }
+  return ratPolyToTex(coeffs); // couldn't fully factor over the reals — show expanded form
+}
+function ratRationalToTex(num,den){
+  const dn=Rat.pdeg(den);
+  if(dn===0){ const k=den[0]; const scaledNum=(Math.abs(k-1)<1e-12)?num:num.map(v=>v/k); return ratFactorToTex(scaledNum); }
+  return `\\frac{${ratFactorToTex(num)}}{${ratFactorToTex(den)}}`;
+}
+/* Functions with no single closed-form derivative through every point (|x| has a corner at 0).
+   For these we refuse the symbolic route entirely and fall back to numeric derivatives. */
+const RAT_HARD_FNS=['abs','sign','floor','ceil','round'];
+function ratContainsHardFn(tr){
+  if(!tr||typeof tr!=='object') return false;
+  if(tr.k==='f'&&RAT_HARD_FNS.includes(tr.n)) return true;
+  return ratContainsHardFn(tr.a)||ratContainsHardFn(tr.b);
+}
+// parse the user's text into a Sym tree, or null if it can't be safely differentiated symbolically
+function ratSafeTree(src){
+  try{
+    const t=Sym.parse((src||'').toLowerCase().replace(/\s+/g,''),['x']);
+    return ratContainsHardFn(t) ? null : t;
+  }catch(e){ return null; }
+}
+// exact f' and f'' when we have a usable tree, numeric central differences otherwise
+function ratDerivFns(tree, f){
+  if(tree){
+    try{
+      const d1=Sym.simp(Sym.diff(tree,'x'));
+      const d2=Sym.simp(Sym.diff(d1,'x'));
+      return { fp:x=>Sym.ev(d1,{x}), f2:x=>Sym.ev(d2,{x}), exact:true };
+    }catch(e){ /* fall through */ }
+  }
+  return { fp:x=>M.nderiv(f,x), f2:x=>M.nderiv2(f,x), exact:false };
+}
+
+// Try to produce compact, factored f′ and f″ for a rational function; falls back to the
+// generic (unfactored) symbolic simplifier when the function isn't a pure rational function.
+function ratSimplifiedDerivs(tree){
+  const d1=Sym.simp(Sym.diff(tree,'x'));
+  const d2=Sym.simp(Sym.diff(d1,'x'));
+  function tryRat(t){ const r=Rat.toRat(t); if(!r) return null; const s=Rat.simplify(r); return ratRationalToTex(s.num,s.den); }
+  const r1=tryRat(d1), r2=tryRat(d2);
+  return { d1tex: r1!==null?r1:Sym.tex(d1), d2tex: r2!==null?r2:Sym.tex(d2), isRational: r1!==null };
+}
+
+/* -------- asymptote detection (exact for rational functions, numeric fallback otherwise) -------- */
+// A pole of f is a zero of g = 1/f, so scan g for sign changes / near-zero dips and
+// refine there. This catches both odd poles (1/x) and even poles (1/x^2), and doesn't
+// depend on f actually overflowing to Infinity at the sample points.
+function ratNumericVerticalAsymptotes(f, lo, hi){
+  const N=2000, h=(hi-lo)/N;
+  // g = 1/f, so a pole of f becomes a zero of g. NaN (outside the domain, e.g. ln of a
+  // negative) is kept distinct from +/-Infinity (a real pole) so gaps aren't read as poles.
+  const g=x=>{ const y=f(x); if(Number.isNaN(y)) return NaN; if(!isFinite(y)) return 0;
+               if(Math.abs(y)<1e-300) return 1e300; return 1/y; };
+  const mags=[]; for(let i=0;i<=200;i++){ const y=f(lo+(hi-lo)*i/200); if(isFinite(y)) mags.push(Math.abs(y)); }
+  mags.sort((a,b)=>a-b);
+  const typ=mags.length?Math.max(mags[Math.floor(mags.length*0.5)],1e-3):1;
+  const BIG=Math.max(typ*500, 1e3);
+  const gs=[]; for(let i=0;i<=N;i++) gs.push(g(lo+i*h));
+  // 1) collect raw candidate intervals where 1/f crosses or touches zero
+  const raw=[];
+  for(let i=0;i<N;i++){
+    const x0=lo+i*h, g0=gs[i], g1=gs[i+1];
+    if(Number.isNaN(g0)||Number.isNaN(g1)) continue;
+    if(g0*g1<0 || Math.min(Math.abs(g0),Math.abs(g1))<1/BIG) raw.push(x0);
+  }
+  if(!raw.length) return [];
+  // 2) chain neighbouring candidates into clusters (one pole can span several samples)
+  const tol=h*8, clusters=[[raw[0],raw[0]]];
+  for(let i=1;i<raw.length;i++){
+    const c=clusters[clusters.length-1];
+    if(raw[i]-c[1]<=tol) c[1]=raw[i]; else clusters.push([raw[i],raw[i]]);
+  }
+  // 3) refine each cluster to the single x where |1/f| bottoms out, then verify it's a real pole
+  const out=[];
+  for(const [ca,cb] of clusters){
+    let a=ca-h, b=cb+2*h;
+    for(let k=0;k<80;k++){
+      const m1=a+(b-a)/3, m2=b-(b-a)/3;
+      const v1=Math.abs(g(m1)), v2=Math.abs(g(m2));
+      ((Number.isNaN(v1)?Infinity:v1)<(Number.isNaN(v2)?Infinity:v2))?b=m2:a=m1;
+    }
+    const hit=(a+b)/2;
+    const probe=Math.max(Math.abs(hit),1)*1e-7;
+    const l=f(hit-probe), r=f(hit+probe), c=f(hit);
+    const big=v=>!Number.isNaN(v)&&(!isFinite(v)||Math.abs(v)>BIG);
+    if(!(big(l)||big(r)||big(c))) continue;              // not actually unbounded here
+    out.push(Math.abs(hit-Math.round(hit))<1e-6 ? Math.round(hit) : Math.round(hit*1e6)/1e6);
+  }
+  return out;
+}
+// limit of f at +/-infinity, estimated by pushing x out and requiring the value to settle
+function ratNumericHorizontalAsymptotes(f){
+  function probe(sign){
+    const ys=[1e4,1e5,1e6,1e7].map(v=>f(v*sign));
+    const last=ys[3], prev=ys[2];
+    if(!isFinite(last)||!isFinite(prev)) return null;
+    if(Math.abs(last-prev)>1e-4*Math.max(1,Math.abs(last))) return null; // still moving -> no finite limit
+    return Math.abs(last)<1e-6 ? 0 : Math.round(last*1e6)/1e6;           // snap away float noise
+  }
+  const p=probe(1), n=probe(-1), res=[];
+  if(p!=null) res.push(p);
+  if(n!=null && (p==null || Math.abs(n-p)>1e-4*Math.max(1,Math.abs(p)))) res.push(n);
+  return res;
+}
+// tree: parsed Sym expression tree for f (or null if it couldn't be parsed); f: compiled numeric function
+function getAsymptotes(tree, f, lo, hi){
+  if(tree){
+    const r=Rat.toRat(tree);
+    if(r){
+      let {num,den}=r; const g=Rat.pgcd(num,den);
+      if(Rat.pdeg(g)>0){ num=Rat.pdivmod(num,g).q; den=Rat.pdivmod(den,g).q; }
+      const vAsym = Rat.pdeg(den)>0 ? Rat.distinctRealRoots(den) : [];
+      const dn=Rat.pdeg(num), dd=Rat.pdeg(den); let hAsym=[];
+      if(dd>0){ if(dn<dd) hAsym=[0]; else if(dn===dd) hAsym=[num[num.length-1]/den[den.length-1]]; }
+      return { vAsym, hAsym, exact:true };
+    }
+  }
+  return { vAsym: ratNumericVerticalAsymptotes(f,lo,hi), hAsym: ratNumericHorizontalAsymptotes(f), exact:false };
+}
+
+/* -------- pick a display window that frames the interesting features -------- */
+// x-window: keep every critical point, inflection point and vertical asymptote on screen,
+// plus enough room either side that the end behaviour (and any horizontal asymptote) reads.
+function ratSmartXDomain(featureXs, vAsym){
+  const pts=[0, ...(featureXs||[]), ...(vAsym||[])].filter(v=>isFinite(v));
+  if(!pts.length) return [-5,5];
+  let lo=Math.min(...pts), hi=Math.max(...pts);
+  const span=hi-lo;
+  const pad=Math.max(3, span*0.9);
+  lo-=pad; hi+=pad;
+  let w=hi-lo, cx=(lo+hi)/2;
+  if(w<8){ lo=cx-4; hi=cx+4; }
+  if(w>28){ lo=cx-14; hi=cx+14; }
+  return [lo,hi];
+}
+// y-window: a min/max over raw samples is useless once the curve has a pole (one sample near
+// the asymptote sets the scale and flattens everything else). So build the range from the
+// points that actually matter -- features and horizontal asymptotes -- widened by a robust
+// percentile band of the curve, ignoring samples sitting next to a vertical asymptote.
+function ratFramedYRange(g, xlo, xhi, mustY, vAsym, featureXs){
+  // Sample only a window centred on the interesting region, not the whole x-range: otherwise a
+  // cubic/quartic's growth at the edges sets the scale and flattens the features to a straight line.
+  const anchors=[0, ...(featureXs||[]), ...(vAsym||[])].filter(v=>isFinite(v)&&v>=xlo&&v<=xhi);
+  const cx = anchors.length ? (Math.min(...anchors)+Math.max(...anchors))/2 : (xlo+xhi)/2;
+  let half = anchors.length ? Math.max(...anchors.map(a=>Math.abs(a-cx)))*1.6 : (xhi-xlo)/2;
+  half = Math.max(half, (xhi-xlo)*0.25);
+  const sLo=Math.max(xlo, cx-half), sHi=Math.min(xhi, cx+half);
+  const N=400, h=(sHi-sLo)/N, guard=(xhi-xlo)*0.02;
+  const ys=[];
+  for(let i=0;i<=N;i++){
+    const x=sLo+i*h;
+    if((vAsym||[]).some(a=>Math.abs(x-a)<guard)) continue;   // skip the blow-up next to a pole
+    const y=g(x);
+    if(isFinite(y)&&Math.abs(y)<1e7) ys.push(y);
+  }
+  const must=(mustY||[]).filter(v=>isFinite(v));
+  let lo,hi;
+  if(ys.length){
+    const sorted=ys.slice().sort((a,b)=>a-b);
+    const q=t=>sorted[Math.min(sorted.length-1,Math.max(0,Math.round(t*(sorted.length-1))))];
+    lo=q(0.06); hi=q(0.94);                                  // robust band, ignores the worst outliers
+  } else if(must.length){ lo=Math.min(...must); hi=Math.max(...must); }
+  else return [-3,3];
+  must.forEach(v=>{ lo=Math.min(lo,v); hi=Math.max(hi,v); }); // features/asymptotes always on screen
+  // If the features span a real height, don't let a nearby pole stretch the window far past them.
+  if(must.length){
+    const mLo=Math.min(...must), mHi=Math.max(...must), mSpan=mHi-mLo;
+    if(mSpan>0){ lo=Math.max(lo, mLo-2.5*mSpan); hi=Math.min(hi, mHi+2.5*mSpan); }
+  }
+  if(!(hi>lo)){ const c=lo, d=Math.max(Math.abs(c)*0.5,1); lo=c-d; hi=c+d; }
+  const pad=(hi-lo)*0.18;
+  return [lo-pad, hi+pad];
+}
+function ratNearAsym(x, vAsym, eps){ return (vAsym||[]).some(a=>Math.abs(x-a)<eps); }
+
+/* -------- curve drawing that BREAKS instead of drawing a false vertical connector --------
+   A canvas polyline joins consecutive samples, so a pole (or a corner in f') otherwise shows
+   up as a near-vertical line that isn't part of the graph at all. These helpers lift the pen
+   across poles and across genuine jumps, and mark the jump with hollow circles (f' is
+   undefined there, e.g. f(x)=|x| at x=0). -------------------------------------------------- */
+function ratHollow(ch,x,y,color,r){
+  const ctx=ch.ctx;
+  ctx.beginPath(); ctx.arc(ch.X(x),ch.Y(y),r||3.6,0,Math.PI*2);
+  ctx.fillStyle=COL.paper; ctx.fill();
+  ctx.lineWidth=1.8; ctx.strokeStyle=color; ctx.stroke();
+}
+// f(x) coloured by the sign of signFn (green/red for rising/falling, or blue/orange for concavity)
+function ratDrawSignColoredCurve(ch, f, signFn, colorPos, colorNeg, N, vAsym, breakXs){
+  const lo=ch.xmin, hi=ch.xmax, h=(hi-lo)/N, eps=h*1.5;
+  const brks=[...(vAsym||[]), ...(breakXs||[])];
+  const yspan=ch.ymax-ch.ymin;
+  ch.clip();
+  const ctx=ch.ctx; ctx.lineWidth=2.7; ctx.lineJoin='round';
+  let pX=null,pY=null,pRaw=null;
+  for(let i=0;i<=N;i++){
+    const x=lo+i*h, y=f(x);
+    if(!isFinite(y) || ratNearAsym(x,vAsym,eps)){ pX=null; continue; }
+    const yc=M.clamp(y, ch.ymin-yspan*3, ch.ymax+yspan*3);
+    const crossedBreak = pX!==null && brks.some(b=>b>pX&&b<=x);
+    if(pX!==null && !crossedBreak && Math.abs(y-pRaw)<yspan*3){
+      const up=signFn((pX+x)/2)>=0;
+      ctx.strokeStyle=up?colorPos:colorNeg;
+      ctx.beginPath(); ctx.moveTo(ch.X(pX),ch.Y(pY)); ctx.lineTo(ch.X(x),ch.Y(yc)); ctx.stroke();
+    }
+    pX=x; pY=yc; pRaw=y;
+  }
+  ch.unclip();
+}
+// single-colour curve for the f'(x) / f''(x) panels; hollow circles show a jump discontinuity
+function ratDrawBreakingCurve(ch, g, color, N, vAsym, breakXs, lw){
+  const lo=ch.xmin, hi=ch.xmax, h=(hi-lo)/N, eps=h*1.5;
+  const yspan=ch.ymax-ch.ymin;
+  ch.clip();
+  const ctx=ch.ctx; ctx.strokeStyle=color; ctx.lineWidth=lw||2.1; ctx.lineJoin='round';
+  let started=false, pX=null, pRaw=null;
+  for(let i=0;i<=N;i++){
+    const x=lo+i*h, y=g(x);
+    if(!isFinite(y) || ratNearAsym(x,vAsym,eps)){ if(started) ctx.stroke(); started=false; pX=null; continue; }
+    const crossedBreak = pX!==null && (breakXs||[]).some(b=>b>pX&&b<=x);
+    if(started && (crossedBreak || Math.abs(y-pRaw)>yspan*3)){ ctx.stroke(); started=false; }
+    const yc=M.clamp(y, ch.ymin-yspan*3, ch.ymax+yspan*3);
+    if(!started){ ctx.beginPath(); ctx.moveTo(ch.X(x),ch.Y(yc)); started=true; }
+    else ctx.lineTo(ch.X(x),ch.Y(yc));
+    pX=x; pRaw=y;
+  }
+  if(started) ctx.stroke();
+  ch.unclip();
+  // hollow circle on each side of a corner: f' genuinely has no value there
+  ch.clip();
+  (breakXs||[]).forEach(b=>{
+    const d=Math.max(Math.abs(b),1)*1e-6;
+    [g(b-d), g(b+d)].forEach(v=>{ if(isFinite(v)&&v>=ch.ymin&&v<=ch.ymax) ratHollow(ch,b,v,color); });
+  });
+  ch.unclip();
+}
+function ratDrawAsymptoteLines(ch, vAsym, hAsym){
+  const gray='rgba(120,132,148,.75)';
+  (vAsym||[]).forEach(x=>{ if(x>ch.xmin&&x<ch.xmax) ch.vline(x, gray, 1.4, [6,4]); });
+  (hAsym||[]).forEach(y=>{ if(y>ch.ymin&&y<ch.ymax) ch.line(ch.xmin,y,ch.xmax,y,gray,1.4,[6,4]); });
+}
+// small grey labels for the asymptote lines
+function ratLabelAsymptotes(ch, vAsym, hAsym){
+  const ctx=ch.ctx; ctx.save();
+  ctx.fillStyle='rgba(90,102,118,.95)'; ctx.font='500 10px "JetBrains Mono",monospace';
+  (vAsym||[]).forEach(x=>{ if(x>ch.xmin&&x<ch.xmax){ ctx.textAlign='left'; ctx.textBaseline='top';
+    ctx.fillText('x = '+M.round(x,3), ch.X(x)+4, ch.py1+3); } });
+  (hAsym||[]).forEach(y=>{ if(y>ch.ymin&&y<ch.ymax){ ctx.textAlign='right'; ctx.textBaseline='bottom';
+    ctx.fillText('y = '+M.round(y,3), ch.px1-4, ch.Y(y)-3); } });
+  ctx.restore();
+}
+
+/* -------- corners: points where f is continuous but f′ jumps (|x| at 0) -------- */
+// The test that separates a corner from ordinary curvature: measure the left/right slope
+// disagreement at offset e, then again at e/8. Across a corner the gap stays the same size;
+// on a smooth curve it shrinks in proportion to e. Using a FIXED offset while searching also
+// turns the disagreement into a tent-shaped bump we can actually hill-climb onto.
+function ratFindCorners(f, lo, hi){
+  const N=600, h=(hi-lo)/N, out=[];
+  const gap=(x,e)=>{ const L=(f(x)-f(x-e))/e, R=(f(x+e)-f(x))/e;
+                     return (isFinite(L)&&isFinite(R)) ? {d:R-L, s:Math.max(Math.abs(L),Math.abs(R),1)} : null; };
+  const bump=x=>{ const g=gap(x,h); return g?Math.abs(g.d)/g.s:0; };
+  const tiny=h*1e-4;
+  const slopeRightOf=p=>(f(p+tiny)-f(p))/tiny;   // constant either side of a kink -> a step function
+  for(let i=1;i<N;i++){
+    const x=lo+i*h;
+    if(!isFinite(f(x))) continue;
+    if(bump(x)<0.3) continue;                          // no meaningful slope disagreement near here
+    if(bump(x-h)>bump(x) || bump(x+h)>bump(x)) continue; // only act on the local peak of the bump
+    // Pin the kink exactly: the slope just right of p is one value left of the kink and another
+    // right of it, so bisect that step function instead of hill-climbing a zero-width spike.
+    let a=x-h, b=x+h;
+    const sa=slopeRightOf(a), sb=slopeRightOf(b);
+    if(!isFinite(sa)||!isFinite(sb)) continue;
+    const scale=Math.max(Math.abs(sa),Math.abs(sb),1);
+    if(Math.abs(sb-sa)<0.3*scale) continue;
+    for(let k=0;k<60 && (b-a)>tiny*4;k++){
+      const m=(a+b)/2;
+      (Math.abs(slopeRightOf(m)-sa) < 0.5*Math.abs(sb-sa)) ? a=m : b=m;
+    }
+    const xc=(a+b)/2;
+    if(!isFinite(f(xc))) continue;
+    const near=gap(xc,h/50), far=gap(xc,h/2000);       // a corner keeps its gap as the offset shrinks
+    if(!near||!far) continue;
+    if(Math.abs(near.d)<0.3*near.s) continue;
+    if(Math.abs(far.d) < 0.5*Math.abs(near.d)) continue; // gap collapsing => ordinary curvature, not a corner
+    const snapped=Math.abs(xc-Math.round(xc))<1e-4?Math.round(xc):Math.round(xc*1e5)/1e5;
+    if(out.some(o=>Math.abs(o.x-snapped)<h*2)) continue;
+    const e=Math.max(Math.abs(snapped),1)*1e-6;
+    out.push({ x:snapped, y:f(snapped), left:(f(snapped)-f(snapped-e))/e, right:(f(snapped+e)-f(snapped))/e });
+  }
+  return out;
+}
+
+/* -------- full feature analysis: exact for rational f, numeric otherwise -------- */
+function ratAnalyze(tree, f, lo, hi){
+  const asym=getAsymptotes(tree, f, lo, hi);
+  const vAsym=asym.vAsym, hAsym=asym.hAsym;
+  const corners=ratFindCorners(f, lo, hi);
+  const isPole=x=>vAsym.some(a=>Math.abs(x-a)<1e-6);
+  const isCorner=x=>corners.some(c=>Math.abs(c.x-x)<1e-4);
+  const D=ratDerivFns(tree,f), fpN=D.fp, f2N=D.f2;
+
+  let crit=[], infl=[], exact=false;
+  const r = tree ? Rat.toRat(tree) : null;
+  if(r){
+    // EXACT path: f is a rational function. Critical numbers are the roots of the numerator
+    // of f′ (after cancelling), inflection candidates the roots of the numerator of f″.
+    exact=true;
+    const rd1=Rat.simplify(Rat.toRat(Sym.simp(Sym.diff(tree,'x'))));
+    const rd2=Rat.simplify(Rat.toRat(Sym.simp(Sym.diff(Sym.simp(Sym.diff(tree,'x')),'x'))));
+    const fp=x=>Rat.peval(rd1.num,x)/Rat.peval(rd1.den,x);
+    const f2=x=>Rat.peval(rd2.num,x)/Rat.peval(rd2.den,x);
+    const step=1e-4;
+    Rat.distinctRealRoots(rd1.num).forEach(x=>{
+      if(isPole(x)) return;                                  // a pole is never a critical point
+      if(Math.abs(Rat.peval(rd1.den,x))<1e-9) return;        // f′ undefined here, not zero
+      const y=f(x); if(!isFinite(y)) return;
+      const L=fp(x-step), R=fp(x+step);
+      let kind=null;
+      if(L>0&&R<0) kind='max'; else if(L<0&&R>0) kind='min';
+      crit.push({x,y,kind});                                 // kind null => flat but neither (e.g. x^3 at 0)
+    });
+    Rat.distinctRealRoots(rd2.num).forEach(x=>{
+      if(isPole(x)) return;
+      if(Math.abs(Rat.peval(rd2.den,x))<1e-9) return;
+      const y=f(x); if(!isFinite(y)) return;
+      if(f2(x-step)*f2(x+step) >= 0) return;                 // no concavity change => not an inflection
+      infl.push({x,y});
+    });
+    crit=crit.filter(c=>c.x>=lo&&c.x<=hi);
+    infl=infl.filter(c=>c.x>=lo&&c.x<=hi);
+  } else {
+    // NUMERIC path: bisect on sign changes, but reject anything sitting on a pole or a corner.
+    const N=800, h=(hi-lo)/N;
+    const scan=(g, push)=>{
+      const xs=[], vs=[];
+      for(let i=0;i<=N;i++){ const x=lo+i*h; xs.push(x); vs.push(g(x)); }
+      const scale=Math.max(...vs.filter(v=>isFinite(v)).map(v=>Math.abs(v)),1);
+      const TINY=scale*1e-9;
+      const accept=(xc,beforeVal)=>{
+        const spansPole=vAsym.some(A=>Math.abs(A-xc)<h*1.5);
+        const spansCorner=corners.some(c=>Math.abs(c.x-xc)<h*1.5);
+        const y=f(xc);
+        if(spansPole||spansCorner||isPole(xc)||isCorner(xc)||!isFinite(y)) return;
+        if(Math.abs(g(xc))>1e-3*scale) return;        // sign flipped without passing through 0 -> not a root
+        push(xc,y,beforeVal);
+      };
+      for(let i=1;i<=N;i++){
+        const a=vs[i-1], b=vs[i];
+        if(!isFinite(a)||!isFinite(b)) continue;
+        if(Math.abs(b)<=TINY){
+          // root sits exactly on a sample point: confirm the sign really flips around it
+          const nxt=(i<N)?vs[i+1]:NaN;
+          if(isFinite(a)&&isFinite(nxt)&&Math.abs(a)>TINY&&Math.abs(nxt)>TINY&&(a>0)!==(nxt>0)) accept(xs[i],a);
+          continue;
+        }
+        if(Math.abs(a)<=TINY) continue;               // handled on the previous iteration
+        if(a*b<0){
+          let p=xs[i-1],q=xs[i];
+          for(let k=0;k<50;k++){ const m=(p+q)/2; (g(p)*g(m)<=0)?q=m:p=m; }
+          accept((p+q)/2, a);
+        }
+      }
+    };
+    scan(fpN,(x,y,before)=>crit.push({x,y,kind: before>0?'max':'min'}));
+    scan(f2N,(x,y)=>infl.push({x,y}));
+  }
+  // a corner is still a critical number: f′ doesn't exist there. Classify with one-sided slopes.
+  corners.forEach(c=>{
+    let kind=null;
+    if(c.left<0&&c.right>0) kind='min'; else if(c.left>0&&c.right<0) kind='max';
+    if(kind) crit.push({x:c.x, y:c.y, kind, corner:true});
+  });
+  crit.sort((a,b)=>a.x-b.x); infl.sort((a,b)=>a.x-b.x);
+  return { crit, infl, corners, vAsym, hAsym, exact };
+}
+
 /* =====================================================================
    CALCULUS I  (Chapters 1–5)
    ===================================================================== */
@@ -1139,55 +1723,82 @@ add({ id:'first-derivative-test', cat:'calc1', tag:'type a function', title:'Loc
 /* ----- Concavity & Inflection Points (Ch 4.3) ----- */
 add({ id:'concavity', cat:'calc1', tag:'type a function', title:'Concavity & Inflection Points', diff:'inter', ch:'Ch 4.3',
   questions:['“Concave up” holds water like a cup; “concave down” spills like a dome. Which way is your curve bending?','An inflection point is where it switches — what does the second derivative do there?','Can a curve be increasing the whole time yet still change concavity?'],
-  blurb:'Type a function. The tool finds the critical numbers (from f′) and the inflection points (from f″), shows both formulas, and shades where the curve is concave up vs concave down.',
+  blurb:'Type a function. The tool finds the critical numbers (from f′) and the inflection points (from f″), shows both formulas in simplified form, marks any asymptotes, and shades where the curve is concave up vs concave down.',
   build(host){
-    const fin=makeFnInput('Function f(x)','x^3 - 3*x',['x'],()=>render(),'try: x^3-3x,  x^4-6x^2,  sin(x),  |x|');
+    const fin=makeFnInput('Function f(x)','x^2/(x-2)^2',['x'],()=>render(),'try: x^2/(x-2)^2,  x^3-3x,  x^4-6x^2,  1/(x^2-4),  sin(x),  |x|');
     const info=document.createElement('div'); info.className='formula'; info.style.lineHeight='1.9';
-    const plot=UI.plotCard('blue = concave up · orange = concave down',330);
+    const plot=UI.plotCard('blue = concave up · orange = concave down · grey dashes = asymptotes',330);
     const d1f=UI.formula(''); const d1=UI.plotCard('first derivative f′(x)',205);
     const d2f=UI.formula(''); const d2=UI.plotCard('second derivative f″(x): + = cup, − = dome, 0 = inflection',205);
-    host.appendChild(UI.appGrid([fin,UI.note('Concavity comes from the <b>second derivative</b>. Where f″ is positive the curve is <b>concave up</b> (a cup, blue); where negative, <b>concave down</b> (a dome, orange). Inflection points are where f″ = 0. Critical numbers (where f′ = 0) are marked too. Both f′ and f″ are drawn below, each zoomed to its own interesting region, so you can see the clues directly. Scroll any graph to zoom in or out.'),info],[plot,d1f,d1,d2f,d2]));
+    host.appendChild(UI.appGrid([fin,UI.note('Concavity comes from the <b>second derivative</b>. Where f″ is positive the curve is <b>concave up</b> (a cup, blue); where negative, <b>concave down</b> (a dome, orange). An <b>inflection point</b> is where f″ actually <em>changes sign</em>. Critical numbers (where f′ = 0) are marked too. <b>Grey dashed lines</b> are vertical and horizontal asymptotes; a <b>hollow circle</b> marks a corner, where f′ does not exist. The window is chosen to fit the whole shape.'),info],[plot,d1f,d1,d2f,d2]));
     plot.enableZoom(render); d1.enableZoom(render); d2.enableZoom(render);
-    const HARD_FNS=['abs','sign','floor','ceil','round'];
-    function containsHardFn(tr){ if(!tr||typeof tr!=='object') return false; if(tr.k==='f'&&HARD_FNS.includes(tr.n)) return true; return containsHardFn(tr.a)||containsHardFn(tr.b); }
-    function symbolicDerivs(){
-      try{
-        const raw=(fin.get()||'').toLowerCase().replace(/\s+/g,'');
-        const tree=Sym.parse(raw,['x']);
-        if(containsHardFn(tree)) return null; // e.g. |x| — no single closed-form derivative through 0
-        const d1t=Sym.simp(Sym.diff(tree,'x'));
-        const d2t=Sym.simp(Sym.diff(d1t,'x'));
-        return { d1tex:Sym.tex(d1t), d2tex:Sym.tex(d2t) };
-      }catch(e){ return null; }
-    }
-    function drawAux(card,g,color,featureXs){
-      const [glo,ghi]=focusedYRange(g,-5,5,featureXs); const gp=padFor(glo,ghi);
-      const c=card.chart(); c.setX(-5,5).setY(Math.min(0,glo)-gp,Math.max(0,ghi)+gp); c.clear(); c.gridlines(niceTicks(c.xmin,c.xmax,6),niceTicks(c.ymin,c.ymax,4)); c.axes(); c.axisX(niceTicks(c.xmin,c.xmax,6)); c.axisY(niceTicks(c.ymin,c.ymax,4)); c.clip(); c.curve(g,color,2.1); c.unclip(); return c; }
+    const SCAN_LO=-14, SCAN_HI=14;
     function render(){
-      const f=fin.fn(); if(!f)return; const fp=x=>M.nderiv(f,x), f2=x=>M.nderiv2(f,x);
-      const lo=-5,hi=5,N=600,h=(hi-lo)/N;
-      const crit=[]; let prevP=fp(lo);
-      for(let i=1;i<=N;i++){ const x=lo+i*h, cur=fp(x); if(isFinite(prevP)&&isFinite(cur)){ if(prevP*cur<0&&(Math.abs(prevP)>1e-6||Math.abs(cur)>1e-6)){ let a=x-h,b=x; for(let k=0;k<40;k++){ const m=(a+b)/2; (fp(a)*fp(m)<=0)?b=m:a=m; } const xc=(a+b)/2; crit.push({x:xc,y:f(xc),kind:fp(xc-0.01)>0?'max':'min'}); } else if(cur===0&&Math.abs(prevP)>1e-6){ const nxt=fp(x+h); if(isFinite(nxt)&&(prevP>0)!==(nxt>0)&&Math.abs(nxt)>1e-6){ crit.push({x:x,y:f(x),kind:fp(x-0.01)>0?'max':'min'}); } } } prevP=cur; }
-      const infl=[]; let prev=f2(lo);
-      for(let i=1;i<=N;i++){ const x=lo+i*h, cur=f2(x); if(isFinite(prev)&&isFinite(cur)){ if(prev*cur<0&&(Math.abs(prev)>1e-6||Math.abs(cur)>1e-6)){ let a=x-h,b=x; for(let k=0;k<40;k++){ const m=(a+b)/2; (f2(a)*f2(m)<=0)?b=m:a=m; } const xc=(a+b)/2; infl.push({x:xc,y:f(xc)}); } else if(cur===0&&Math.abs(prev)>1e-6){ const nxt=f2(x+h); if(isFinite(nxt)&&(prev>0)!==(nxt>0)&&Math.abs(nxt)>1e-6){ infl.push({x:x,y:f(x)}); } } } prev=cur; }
-      let rows = crit.length ? crit.map(c=>'<b style="color:'+(c.kind==='max'?COL.optim:COL.calc2)+'">local '+c.kind+'</b> at x = '+M.round(c.x,3)+',  f = '+M.round(c.y,3)+'<br>').join('') : 'No critical numbers in [−5, 5] for this function.<br>';
-      rows += infl.length ? infl.map(c=>'<b style="color:'+COL.calc3+'">inflection</b> at x = '+M.round(c.x,3)+',  f = '+M.round(c.y,3)+'<br>').join('') : 'No inflection points in [−5, 5] for this function.<br>';
+      const f=fin.fn(); if(!f)return;
+      const tree=ratSafeTree(fin.get());
+      const A=ratAnalyze(tree,f,SCAN_LO,SCAN_HI);
+      const D=ratDerivFns(tree,f), fp=D.fp, f2=D.f2;
+      const featX=[...A.crit.map(c=>c.x), ...A.infl.map(c=>c.x)];
+      const breakX=A.corners.map(c=>c.x);
+      const [bxlo,bxhi]=ratSmartXDomain(featX,A.vAsym);
+
+      /* ---- formulas, simplified (factored) where f is a rational function ---- */
+      if(tree){ const S=ratSimplifiedDerivs(tree);
+        renderMath(d1f, "f^{\\prime}(x) = "+S.d1tex, true);
+        renderMath(d2f, "f^{\\prime\\prime}(x) = "+S.d2tex, true);
+      } else {
+        d1f.set('<span style="color:'+COL.faint+';font-style:italic">f′(x) — no single closed form here (e.g. |x| has a corner); shown numerically only</span>');
+        d2f.set('');
+      }
+
+      /* ---- readout ---- */
+      let rows='';
+      if(A.vAsym.length||A.hAsym.length){
+        rows+='<span style="color:'+COL.soft+'">';
+        if(A.vAsym.length) rows+='vertical asymptote'+(A.vAsym.length>1?'s':'')+': '+A.vAsym.map(v=>'x = '+M.round(v,3)).join(', ')+'<br>';
+        if(A.hAsym.length) rows+='horizontal asymptote'+(A.hAsym.length>1?'s':'')+': '+A.hAsym.map(v=>'y = '+M.round(v,3)).join(', ')+'<br>';
+        rows+='</span>';
+      }
+      const named=A.crit.filter(c=>c.kind);
+      rows += named.length
+        ? named.map(c=>'<b style="color:'+(c.kind==='max'?COL.optim:COL.calc2)+'">local '+c.kind+'</b> at x = '+M.round(c.x,3)+',  f = '+M.round(c.y,3)+(c.corner?' <span style="color:'+COL.soft+'">(corner — f′ undefined)</span>':'')+'<br>').join('')
+        : 'No local max/min in view for this function.<br>';
+      A.crit.filter(c=>!c.kind).forEach(c=>{ rows+='<span style="color:'+COL.soft+'">f′ = 0 at x = '+M.round(c.x,3)+' but the slope does not change sign — neither a max nor a min</span><br>'; });
+      rows += A.infl.length
+        ? A.infl.map(c=>'<b style="color:'+COL.calc3+'">inflection</b> at x = '+M.round(c.x,3)+',  f = '+M.round(c.y,3)+'<br>').join('')
+        : 'No inflection points in view for this function.<br>';
       info.innerHTML=rows;
-      const sd=symbolicDerivs();
-      if(sd){ renderMath(d1f, "f^{\\prime}(x) = "+sd.d1tex, true); renderMath(d2f, "f^{\\prime\\prime}(x) = "+sd.d2tex, true); }
-      else { d1f.set('<span style="color:'+COL.faint+';font-style:italic">f′(x) — no single closed form here (e.g. |x|); shown numerically only</span>'); d2f.set(''); }
-      let [ylo,yhi]=focusedYRange(f,lo,hi,[...crit.map(c=>c.x),...infl.map(c=>c.x)]),pad=padFor(ylo,yhi);
-      const ch=plot.chart(); ch.setX(lo,hi).setY(ylo-pad,yhi+pad); ch.clear(); ch.gridlines(niceTicks(ch.xmin,ch.xmax,6),niceTicks(ch.ymin,ch.ymax,5)); ch.axes(); ch.axisX(niceTicks(ch.xmin,ch.xmax,6)); ch.axisY(niceTicks(ch.ymin,ch.ymax,5));
-      ch.clip(); const ctx=ch.ctx; let pX=null,pY=null;
-      for(let i=0;i<=N;i++){ const x=lo+i*h, y=f(x); if(!isFinite(y)){pX=null;continue;} const yc=M.clamp(y,ch.ymin-50,ch.ymax+50); const up=f2(x)>=0;
-        if(pX!==null){ ctx.strokeStyle=up?COL.calc1:COL.optim; ctx.lineWidth=2.7; ctx.beginPath(); ctx.moveTo(ch.X(pX),ch.Y(pY)); ctx.lineTo(ch.X(x),ch.Y(yc)); ctx.stroke(); } pX=x; pY=yc; }
-      ch.unclip();
-      crit.forEach(c=>ch.dot(c.x,c.y,c.kind==='max'?COL.optim:COL.calc2,6));
-      infl.forEach(c=>ch.dot(c.x,c.y,COL.calc3,6));
-      const d1c=drawAux(d1,fp,COL.deriv,crit.map(c=>c.x));
-      crit.forEach(c=>d1c.dot(c.x,0,c.kind==='max'?COL.optim:COL.calc2,5));
-      const d2c=drawAux(d2,f2,COL.amber,infl.map(c=>c.x));
-      infl.forEach(c=>d2c.dot(c.x,0,COL.calc3,5));
+
+      /* ---- main plot ---- */
+      const mustY=[...A.crit.map(c=>c.y), ...A.infl.map(c=>c.y), ...A.hAsym];
+      const [bylo,byhi]=ratFramedYRange(f,bxlo,bxhi,mustY,A.vAsym,featX);
+      const ch=plot.chart(); ch.setX(bxlo,bxhi).setY(bylo,byhi); ch.clear();
+      ch.gridlines(niceTicks(ch.xmin,ch.xmax,6),niceTicks(ch.ymin,ch.ymax,5)); ch.axes();
+      ch.axisX(niceTicks(ch.xmin,ch.xmax,6)); ch.axisY(niceTicks(ch.ymin,ch.ymax,5));
+      // re-detect asymptotes across whatever range is actually on screen (the user may have zoomed out)
+      const vis=getAsymptotes(tree,f,ch.xmin,ch.xmax);
+      ratDrawAsymptoteLines(ch,vis.vAsym,vis.hAsym);
+      ratDrawSignColoredCurve(ch,f,f2,COL.calc1,COL.optim,700,vis.vAsym,breakX);
+      ratLabelAsymptotes(ch,vis.vAsym,vis.hAsym);
+      A.crit.forEach(c=>{ if(!c.kind) return; const col=c.kind==='max'?COL.optim:COL.calc2;
+        c.corner ? ratHollow(ch,c.x,c.y,col,5.5) : ch.dot(c.x,c.y,col,6); });
+      A.infl.forEach(c=>ch.dot(c.x,c.y,COL.calc3,6));
+
+      /* ---- f′ and f″ panels ---- */
+      function drawAux(card,g,color,marks,markCol){
+        const gv=getAsymptotes(null,g,bxlo,bxhi);          // f′,f″ blow up at the same x as f
+        const gAsym=A.vAsym.length?A.vAsym:gv.vAsym;
+        const [glo,ghi]=ratFramedYRange(g,bxlo,bxhi,marks.map(m=>0),gAsym,featX);
+        const c=card.chart(); c.setX(bxlo,bxhi).setY(Math.min(0,glo),Math.max(0,ghi)); c.clear();
+        c.gridlines(niceTicks(c.xmin,c.xmax,6),niceTicks(c.ymin,c.ymax,4)); c.axes();
+        c.axisX(niceTicks(c.xmin,c.xmax,6)); c.axisY(niceTicks(c.ymin,c.ymax,4));
+        ratDrawAsymptoteLines(c,gAsym,[]);
+        ratDrawBreakingCurve(c,g,color,700,gAsym,breakX,2.1);
+        marks.forEach(m=>c.dot(m,0,markCol,5));
+        return c;
+      }
+      drawAux(d1,fp,COL.deriv,A.crit.filter(c=>!c.corner).map(c=>c.x),COL.calc2);
+      drawAux(d2,f2,COL.amber,A.infl.map(c=>c.x),COL.calc3);
     }
     render();
   }
@@ -1196,37 +1807,63 @@ add({ id:'concavity', cat:'calc1', tag:'type a function', title:'Concavity & Inf
 /* ----- Curve Sketcher — all the clues (Ch 4.5) ----- */
 add({ id:'curve-sketcher', cat:'calc1', tag:'type a function', title:'Curve Sketcher — all the clues', diff:'adv', ch:'Ch 4.5',
   questions:['Where are the peaks and valleys, and where does the bend switch?','Do the rising/falling colors agree with where the peaks and valleys sit?','Could you reproduce this sketch by hand from f′ and f″ alone?'],
-  blurb:'Type a function and get the whole picture: rising/falling coloring, local max/min dots, inflection points, plus optional f′ and f″ overlays — everything curve sketching asks for.',
+  blurb:'Type a function and get the whole picture: rising/falling coloring, local max/min dots, inflection points, asymptotes, plus optional f′ and f″ overlays — everything curve sketching asks for.',
   build(host){
-    const fin=makeFnInput('Function f(x)','x^3 - 3*x',['x'],()=>render(),'try: x^3-3x,  x^4-2x^2,  x/(1+x^2)');
+    const fin=makeFnInput('Function f(x)','x^2/(x-2)^2',['x'],()=>render(),'try: x^2/(x-2)^2,  x^3-3x,  x^4-2x^2,  x/(1+x^2),  |x|');
     const showD1=UI.seg({label:'Show slope f′(x)?',options:[{label:'Hide',value:'0'},{label:'Show',value:'1'}],value:'0',onchange:render});
     const showD2=UI.seg({label:'Show bend f″(x)?',options:[{label:'Hide',value:'0'},{label:'Show',value:'1'}],value:'0',onchange:render});
     const info=document.createElement('div'); info.className='formula'; info.style.lineHeight='1.9';
-    const plot=UI.plotCard('rising/falling colored · dots = max, min, inflection',380);
-    host.appendChild(UI.appGrid([fin,showD1,showD2,UI.note('Green/red = increasing/decreasing (from the slope). Orange dot = local max, teal dot = local min. Purple dot = inflection point (from the bend). Flip on the f′ and f″ overlays to see the clues behind the sketch. Scroll to zoom in or out.'),info],[plot]));
+    const fdisp=UI.formula('');
+    const plot=UI.plotCard('rising/falling colored · dots = max, min, inflection · grey dashes = asymptotes',380);
+    host.appendChild(UI.appGrid([fin,showD1,showD2,UI.note('Green/red = <b>increasing/decreasing</b> (from the slope). Orange dot = local max, teal dot = local min, purple dot = <b>inflection</b>. <b>Grey dashed lines</b> are vertical and horizontal asymptotes — the curve never crosses a vertical one, so the sketch breaks there rather than joining up. A <b>hollow circle</b> marks a corner, where f′ does not exist. Flip on the f′ and f″ overlays to see the clues behind the sketch.'),fdisp,info],[plot]));
     plot.enableZoom(render);
+    const SCAN_LO=-14, SCAN_HI=14;
     function render(){
-      const f=fin.fn(); if(!f)return; const fp=x=>M.nderiv(f,x), f2=x=>M.nderiv2(f,x);
-      const lo=-5,hi=5,N=600,h=(hi-lo)/N;
-      const crit=[]; let prev=fp(lo);
-      for(let i=1;i<=N;i++){ const x=lo+i*h, cur=fp(x); if(isFinite(prev)&&isFinite(cur)){ if(prev*cur<0&&(Math.abs(prev)>1e-6||Math.abs(cur)>1e-6)){ let a=x-h,b=x; for(let k=0;k<40;k++){ const m=(a+b)/2; (fp(a)*fp(m)<=0)?b=m:a=m;} const xc=(a+b)/2; crit.push({x:xc,y:f(xc),kind:fp(xc-0.01)>0?'max':'min'}); } else if(cur===0&&Math.abs(prev)>1e-6){ const nxt=fp(x+h); if(isFinite(nxt)&&(prev>0)!==(nxt>0)&&Math.abs(nxt)>1e-6){ crit.push({x:x,y:f(x),kind:fp(x-0.01)>0?'max':'min'}); } } } prev=cur; }
-      const infl=[]; let p2=f2(lo);
-      for(let i=1;i<=N;i++){ const x=lo+i*h, cur=f2(x); if(isFinite(p2)&&isFinite(cur)){ if(p2*cur<0&&(Math.abs(p2)>1e-6||Math.abs(cur)>1e-6)){ let a=x-h,b=x; for(let k=0;k<40;k++){ const m=(a+b)/2; (f2(a)*f2(m)<=0)?b=m:a=m;} const xc=(a+b)/2; infl.push({x:xc,y:f(xc)}); } else if(cur===0&&Math.abs(p2)>1e-6){ const nxt=f2(x+h); if(isFinite(nxt)&&(p2>0)!==(nxt>0)&&Math.abs(nxt)>1e-6){ infl.push({x:x,y:f(x)}); } } } p2=cur; }
+      const f=fin.fn(); if(!f)return;
+      const tree=ratSafeTree(fin.get());
+      const A=ratAnalyze(tree,f,SCAN_LO,SCAN_HI);
+      const D=ratDerivFns(tree,f), fp=D.fp, f2=D.f2;
+      const featX=[...A.crit.map(c=>c.x), ...A.infl.map(c=>c.x)];
+      const breakX=A.corners.map(c=>c.x);
+      const [bxlo,bxhi]=ratSmartXDomain(featX,A.vAsym);
+
+      /* ---- simplified f′ / f″ formulas ---- */
+      if(tree){ const S=ratSimplifiedDerivs(tree);
+        renderMath(fdisp, "f^{\\prime}(x) = "+S.d1tex+" \\qquad f^{\\prime\\prime}(x) = "+S.d2tex, true);
+      } else fdisp.set('<span style="color:'+COL.faint+';font-style:italic">f′(x), f″(x) — no single closed form here (e.g. |x| has a corner); computed numerically</span>');
+
+      /* ---- readout ---- */
       let rows='';
-      rows += crit.length ? crit.map(c=>'<span style="color:'+(c.kind==='max'?COL.optim:COL.calc2)+'">local '+c.kind+'</span> ('+M.round(c.x,2)+', '+M.round(c.y,2)+')').join(' &nbsp; ')+'<br>' : 'no local max/min in view<br>';
-      rows += infl.length ? infl.map(c=>'<span style="color:'+COL.calc3+'">inflection</span> ('+M.round(c.x,2)+', '+M.round(c.y,2)+')').join(' &nbsp; ') : 'no inflection points in view';
+      if(A.vAsym.length||A.hAsym.length){
+        rows+='<span style="color:'+COL.soft+'">';
+        if(A.vAsym.length) rows+='vertical asymptote'+(A.vAsym.length>1?'s':'')+': '+A.vAsym.map(v=>'x = '+M.round(v,3)).join(', ')+' &nbsp; ';
+        if(A.hAsym.length) rows+='horizontal asymptote'+(A.hAsym.length>1?'s':'')+': '+A.hAsym.map(v=>'y = '+M.round(v,3)).join(', ');
+        rows+='</span><br>';
+      }
+      const named=A.crit.filter(c=>c.kind);
+      rows += named.length
+        ? named.map(c=>'<span style="color:'+(c.kind==='max'?COL.optim:COL.calc2)+'">local '+c.kind+'</span> ('+M.round(c.x,2)+', '+M.round(c.y,2)+')'+(c.corner?' <span style="color:'+COL.soft+'">corner</span>':'')).join(' &nbsp; ')+'<br>'
+        : 'no local max/min in view<br>';
+      rows += A.infl.length
+        ? A.infl.map(c=>'<span style="color:'+COL.calc3+'">inflection</span> ('+M.round(c.x,2)+', '+M.round(c.y,2)+')').join(' &nbsp; ')
+        : 'no inflection points in view';
       info.innerHTML=rows;
-      let [ylo,yhi]=focusedYRange(f,lo,hi,[...crit.map(c=>c.x),...infl.map(c=>c.x)]),pad=(yhi-ylo)*.18||1;
-      const ch=plot.chart(); ch.setX(lo,hi).setY(ylo-pad,yhi+pad); ch.clear(); ch.gridlines(niceTicks(ch.xmin,ch.xmax,6),niceTicks(ch.ymin,ch.ymax,5)); ch.axes(); ch.axisX(niceTicks(ch.xmin,ch.xmax,6)); ch.axisY(niceTicks(ch.ymin,ch.ymax,5));
-      ch.clip();
-      if(showD1.get()==='1') ch.curve(fp,hexA(COL.deriv,.6),1.6);
-      if(showD2.get()==='1') ch.curve(f2,hexA(COL.amber,.75),1.6);
-      const ctx=ch.ctx; let pX=null,pY=null;
-      for(let i=0;i<=N;i++){ const x=lo+i*h, y=f(x); if(!isFinite(y)){pX=null;continue;} const yc=M.clamp(y,ch.ymin-50,ch.ymax+50); const up=fp(x)>=0;
-        if(pX!==null){ ctx.strokeStyle=up?COL.calc2:COL.coral; ctx.lineWidth=2.9; ctx.beginPath(); ctx.moveTo(ch.X(pX),ch.Y(pY)); ctx.lineTo(ch.X(x),ch.Y(yc)); ctx.stroke(); } pX=x; pY=yc; }
-      ch.unclip();
-      crit.forEach(c=>ch.dot(c.x,c.y,c.kind==='max'?COL.optim:COL.calc2,6));
-      infl.forEach(c=>ch.dot(c.x,c.y,COL.calc3,5));
+
+      /* ---- plot ---- */
+      const mustY=[...A.crit.map(c=>c.y), ...A.infl.map(c=>c.y), ...A.hAsym];
+      const [bylo,byhi]=ratFramedYRange(f,bxlo,bxhi,mustY,A.vAsym,featX);
+      const ch=plot.chart(); ch.setX(bxlo,bxhi).setY(bylo,byhi); ch.clear();
+      ch.gridlines(niceTicks(ch.xmin,ch.xmax,6),niceTicks(ch.ymin,ch.ymax,5)); ch.axes();
+      ch.axisX(niceTicks(ch.xmin,ch.xmax,6)); ch.axisY(niceTicks(ch.ymin,ch.ymax,5));
+      const vis=getAsymptotes(tree,f,ch.xmin,ch.xmax);
+      ratDrawAsymptoteLines(ch,vis.vAsym,vis.hAsym);
+      if(showD1.get()==='1') ratDrawBreakingCurve(ch,fp,hexA(COL.deriv,.6),600,vis.vAsym,breakX,1.6);
+      if(showD2.get()==='1') ratDrawBreakingCurve(ch,f2,hexA(COL.amber,.75),600,vis.vAsym,breakX,1.6);
+      ratDrawSignColoredCurve(ch,f,fp,COL.calc2,COL.coral,700,vis.vAsym,breakX);
+      ratLabelAsymptotes(ch,vis.vAsym,vis.hAsym);
+      A.crit.forEach(c=>{ if(!c.kind) return; const col=c.kind==='max'?COL.optim:COL.calc2;
+        c.corner ? ratHollow(ch,c.x,c.y,col,5.5) : ch.dot(c.x,c.y,col,6); });
+      A.infl.forEach(c=>ch.dot(c.x,c.y,COL.calc3,5));
     }
     render();
   }
