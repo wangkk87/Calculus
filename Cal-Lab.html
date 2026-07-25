@@ -1368,13 +1368,17 @@ add({ id:'function-transforms', cat:'calc1', tag:'explore', title:'Function Tran
     const c=UI.slider({label:'c · horizontal shift',min:-4,max:4,step:.1,value:0,fmt:v=>v.toFixed(1),oninput:render});
     const d=UI.slider({label:'d · vertical shift',min:-4,max:4,step:.1,value:0,fmt:v=>v.toFixed(1),oninput:render});
     const reset=UI.buttons([{label:'Reset to f(x)',onclick:()=>{a.set(1);b.set(1);c.set(0);d.set(0);render();}}]);
-    const f=UI.formula(''); const plot=UI.plotCard('y = a · f(b(x − c)) + d',360);
+    const f=UI.formula(''); const plot=UI.plotCard('y = a · f(b(x − c)) + d',480);
     host.appendChild(UI.appGrid([sel,a,b,c,d,reset,f,UI.note('The <b>base</b> graph is faint; the <b>transformed</b> graph is bold. Note that <b>c</b> shifts <em>right</em> when positive, and <b>b</b> compresses horizontally when |b| > 1.')],[plot]));
     plot.enableZoom(render);
     function render(){
       const A=a.get(),B=b.get(),C=c.get(),D=d.get(),base=bases[key];
       const g=x=>A*base(B*(x-C))+D;
-      f.set(`y = ${M.round(A,1)} · f( ${M.round(B,1)}( x ${C>=0?'−':'+'} ${Math.abs(M.round(C,1))} ) ) ${D>=0?'+':'−'} ${Math.abs(M.round(D,1))}`);
+      const Ar=M.round(A,1),Br=M.round(B,1),Cr=M.round(C,1),Dr=M.round(D,1);
+      const CxExpr = (Cr>=0? `x-${Cr}` : `x+${Math.abs(Cr)}`);
+      const Dsign = (Dr>=0? `+\\,${Dr}` : `-\\,${Math.abs(Dr)}`);
+      const latex = `\\begin{aligned} y &= a\\cdot f\\big(b(x-c)\\big)+d \\\\[8pt] &= ${Ar}\\cdot f\\big(${Br}(${CxExpr})\\big) ${Dsign} \\end{aligned}`;
+      renderMath(f, latex, true);
       const ch=plot.chart(); ch.setX(-6,6).setY(-6,6); ch.clear();
       ch.gridlines(niceTicks(-6,6,6),niceTicks(-6,6,6)); ch.axes(); ch.axisX(niceTicks(-6,6,6)); ch.axisY(niceTicks(-6,6,6));
       ch.curve(base,hexA(COL.slate,.5),2);
@@ -1391,28 +1395,37 @@ add({ id:'limit-explorer', cat:'calc1', tag:'interactive', title:'Limit Explorer
   build(host){
     const fin=makeFnInput('Function f(x)','sin(x)/x',['x'],()=>render(),'use ( ) for grouping: sin(x)/(2*x), not sin(x)/2*x');
     const aIn=UI.number({label:'Approach x → a',value:0,step:'any',onchange:render});
-    const plot=UI.plotCard('Zooming in on x = a',300);
-    const tbl=document.createElement('div'); tbl.className='formula'; tbl.style.lineHeight='1.9';
-    host.appendChild(UI.appGrid([fin,aIn,UI.note('The table shows f(x) as x creeps toward a from each side. If both columns head to the same number, that number is the <b>limit</b> — even when f(a) is undefined (a <b>hollow dot</b>) or sits somewhere else (a removable hole). Drag/scroll the plot to zoom.'),tbl],[plot]));
+    const plot=UI.plotCard('Zooming in on x = a',420);
+    const tbl=document.createElement('div'); tbl.className='formula'; tbl.style.cssText='display:grid;grid-template-columns:1fr 1fr;gap:4px 20px;line-height:1.75;font-size:.82rem;';
+    const concl=UI.statsBox();
+    host.appendChild(UI.appGrid([fin,aIn,UI.note('The table shows f(x) as x creeps toward a from each side. If both columns head to the same number, that number is the <b>limit</b> — even when f(a) is undefined (a <b>hollow dot</b>) or sits somewhere else (a removable hole). Drag/scroll the plot to zoom.')],[plot,tbl,concl]));
     plot.enableZoom(render);
     function sideLimit(f,a,dir){ let v=NaN; for(const o of [1e-1,1e-2,1e-3,1e-4,1e-5,1e-6]){ const y=f(a+dir*o); if(isFinite(y))v=y; } return v; }
     function render(){
       const f=fin.fn(); if(!f)return; const a=aIn.get();
       const offs=[1,0.5,0.1,0.01,0.001];
       const left=offs.map(o=>({x:a-o,y:f(a-o)})), right=offs.slice().reverse().map(o=>({x:a+o,y:f(a+o)}));
-      let rows='<b>x → a⁻ (from left)</b><br>';
-      left.forEach(p=>{ rows+=`x=${M.round(p.x,4)} → f(x)=${isFinite(p.y)?M.round(p.y,5):'undefined'}<br>`; });
-      rows+='<br><b>x → a⁺ (from right)</b><br>';
-      right.forEach(p=>{ rows+=`x=${M.round(p.x,4)} → f(x)=${isFinite(p.y)?M.round(p.y,5):'undefined'}<br>`; });
+      let rows=`<div style="font-weight:600;color:${COL.calc2}">x → a⁻ (from left)</div><div style="font-weight:600;color:${COL.calc3}">x → a⁺ (from right)</div>`;
+      for(let i=0;i<left.length;i++){
+        rows+=`<div>x=${M.round(left[i].x,4)} → f(x)=${isFinite(left[i].y)?M.round(left[i].y,5):'undefined'}</div>`;
+        rows+=`<div>x=${M.round(right[i].x,4)} → f(x)=${isFinite(right[i].y)?M.round(right[i].y,5):'undefined'}</div>`;
+      }
+      tbl.innerHTML=rows;
       const fa=f(a); const Lm=sideLimit(f,a,-1), Lp=sideLimit(f,a,1);
       const exists=isFinite(Lm)&&isFinite(Lp)&&Math.abs(Lp-Lm)<1e-3; const L=(Lp+Lm)/2;
-      rows+=`<br>left limit L⁻ ≈ ${isFinite(Lm)?M.round(Lm,5):'—'}`;
-      rows+=`<br>right limit L⁺ ≈ ${isFinite(Lp)?M.round(Lp,5):'—'}`;
-      rows+=`<br>f(${M.round(a,3)}) = ${isFinite(fa)?M.round(fa,5):'<span style="color:'+COL.coral+'">undefined</span>'}`;
-      if(exists){ rows+=`<br><b style="color:${COL.calc1}">limit = ${M.round(L,5)}</b>`;
-        if(!isFinite(fa)||Math.abs(fa-L)>1e-3) rows+=` <span style="color:${COL.amber}">(removable hole — f(a) ≠ limit)</span>`; }
-      else rows+=`<br><b style="color:${COL.coral}">left ≠ right → limit does not exist</b>`;
-      tbl.innerHTML=rows;
+      const conclData=[
+        {k:'left limit L⁻ (x→a⁻)', v: isFinite(Lm)?M.round(Lm,5):'—'},
+        {k:'right limit L⁺ (x→a⁺)', v: isFinite(Lp)?M.round(Lp,5):'—'},
+        {k:`f(${M.round(a,3)})`, v: isFinite(fa)?M.round(fa,5):`<span style="color:${COL.coral}">undefined</span>`}
+      ];
+      if(exists){
+        let lv=`<span style="color:${COL.calc1}">${M.round(L,5)}</span>`;
+        if(!isFinite(fa)||Math.abs(fa-L)>1e-3) lv+=`<div style="font-size:.68rem;font-weight:500;color:${COL.amber};margin-top:2px;">removable hole — f(a) ≠ limit</div>`;
+        conclData.push({k:'limit', v:lv, accent:1});
+      } else {
+        conclData.push({k:'limit', v:`<span style="color:${COL.coral}">does not exist</span><div style="font-size:.68rem;font-weight:500;color:${COL.soft};margin-top:2px;">left ≠ right</div>`, accent:1});
+      }
+      concl.set(conclData);
       const span=2; const ch=plot.chart(); ch.setX(a-span,a+span);
       const ys=[]; for(let i=0;i<=80;i++){ const x=a-span+2*span*i/80; const y=f(x); if(isFinite(y)&&Math.abs(y)<1e4)ys.push(y); }
       let ylo=ys.length?M.min(ys):-2, yhi=ys.length?M.max(ys):2; if(exists){ylo=Math.min(ylo,L);yhi=Math.max(yhi,L);} const pad=(yhi-ylo)*0.15||1;
@@ -1511,29 +1524,65 @@ add({ id:'derivative-grapher', cat:'calc1', tag:'explore', title:'Graph of the D
   questions:['Where f has a local max or min, what is the value of f′?','Where f′ is positive, is f rising or falling?','Where f′ has its own max/min, what is special about f there (inflection)?'],
   blurb:'See f and its derivative f′ stacked together. Move the point to read slope as height.',
   build(host){
-    const fin=makeFnInput('Function f(x)','x^3 - 3*x',['x'],()=>render());
+    const fin=makeFnInput('Function f(x)','x^3 - 3*x',['x'],()=>render(),'try: x^3-3x,  x^2/(x-2),  1/(x^2-1),  sin(x)');
     const px=UI.slider({label:'point x',min:-4,max:4,step:.05,value:0.5,fmt:v=>v.toFixed(2),oninput:render});
     const show2=UI.seg({label:'Also show f″ (concavity)',options:[{label:'Off',value:0},{label:'On',value:1}],value:0,onchange:render});
     const stats=UI.statsBox();
-    const top=UI.plotCard('f(x) — original',230); const bot=UI.plotCard("f′(x) — derivative (slope of f above)",230);
-    host.appendChild(UI.appGrid([fin,px,show2,stats,UI.note('The bottom graph plots the <b>slope</b> of the top graph. Wherever f is flat (a peak or valley), f′ crosses zero. Wherever f′ is above the axis, f is increasing.')],[top,bot]));
+    const info=document.createElement('div'); info.className='formula'; info.style.lineHeight='1.9';
+    const top=UI.plotCard('f(x) — original',260); const bot=UI.plotCard("f′(x) — derivative (slope of f above)",260);
+    host.appendChild(UI.appGrid([fin,px,show2,stats,UI.note('The bottom graph plots the <b>slope</b> of the top graph. Wherever f is flat (a peak or valley), f′ crosses zero — marked with a dot on both graphs. <b>Grey dashed lines</b> are asymptotes. The window auto-fits both curves, even for rational functions.'),info],[top,bot]));
     top.enableZoom(render); bot.enableZoom(render);
+    const SCAN_LO=-14, SCAN_HI=14;
     function render(){
       const f=fin.fn(); if(!f)return; const x=px.get();
-      const df=u=>M.nderiv(f,u), ddf=u=>M.nderiv2(f,u);
-      const fx=f(x),dfx=df(x),ddfx=ddf(x);
-      stats.set([{k:'x',v:M.round(x,2)},{k:'f(x)',v:M.round(fx,3)},{k:"f′(x) slope",v:M.round(dfx,3),accent:1},{k:'f″(x)',v:M.round(ddfx,3)},{k:'shape',v: dfx>0.02?'↗ rising':dfx<-0.02?'↘ falling':'→ flat'}]);
-      const XL=-5,XR=5;
-      // top
-      let ys=[]; for(let i=0;i<=80;i++){ const xx=XL+(XR-XL)*i/80,y=f(xx); if(isFinite(y)&&Math.abs(y)<200)ys.push(y);} let a=ys.length?M.min(ys):-5,bb=ys.length?M.max(ys):5; let p=padFor(a,bb);
-      const ct=top.chart(); ct.setX(XL,XR).setY(a-p,bb+p); ct.clear(); ct.gridlines(niceTicks(XL,XR,6),niceTicks(a-p,bb+p,4)); ct.axes(); ct.axisX(niceTicks(XL,XR,6)); ct.axisY(niceTicks(a-p,bb+p,4));
-      ct.curve(f,COL.calc1,2.4); ct.line(x-1.4,fx-dfx*1.4,x+1.4,fx+dfx*1.4,COL.coral,2); ct.dot(x,fx,COL.ink,5);
-      // bottom
-      let dys=[]; for(let i=0;i<=80;i++){ const xx=XL+(XR-XL)*i/80,y=df(xx); if(isFinite(y)&&Math.abs(y)<200)dys.push(y);} let da=dys.length?M.min(dys):-5,db=dys.length?M.max(dys):5; let dp=padFor(da,db);
-      const cb=bot.chart(); cb.setX(XL,XR).setY(da-dp,db+dp); cb.clear(); cb.gridlines(niceTicks(XL,XR,6),niceTicks(da-dp,db+dp,4)); cb.axes(); cb.axisX(niceTicks(XL,XR,6)); cb.axisY(niceTicks(da-dp,db+dp,4));
-      cb.curve(df,COL.calc2,2.4);
-      if(show2.get()=='1') cb.curve(ddf,hexA(COL.calc3,.7),1.8,200);
-      cb.dot(x,dfx,COL.coral,5); cb.line(XL,0,XR,0,hexA(COL.faint,.5),1,[3,3]);
+      const tree=ratSafeTree(fin.get());
+      const A=ratAnalyze(tree,f,SCAN_LO,SCAN_HI);
+      const D=ratDerivFns(tree,f), fp=D.fp, f2=D.f2;
+      const fx=f(x),dfx=fp(x),ddfx=f2(x);
+      stats.set([{k:'x',v:M.round(x,2)},{k:'f(x)',v:isFinite(fx)?M.round(fx,3):'undefined'},{k:"f′(x) slope",v:isFinite(dfx)?M.round(dfx,3):'undefined',accent:1},{k:'f″(x)',v:isFinite(ddfx)?M.round(ddfx,3):'undefined'},{k:'shape',v: dfx>0.02?'↗ rising':dfx<-0.02?'↘ falling':'→ flat'}]);
+
+      const featX=[...A.crit.map(c=>c.x), ...A.infl.map(c=>c.x)];
+      const breakX=A.corners.map(c=>c.x);
+      const [bxlo,bxhi]=ratSmartXDomain(featX,A.vAsym);
+
+      // ---- top: f(x) ----
+      const mustYtop=[...A.crit.map(c=>c.y), ...A.infl.map(c=>c.y), ...A.hAsym];
+      const [ylo,yhi]=ratFramedYRange(f,bxlo,bxhi,mustYtop,A.vAsym,featX);
+      const ct=top.chart(); ct.setX(bxlo,bxhi).setY(ylo,yhi); ct.clear();
+      ct.gridlines(niceTicks(ct.xmin,ct.xmax,6),niceTicks(ct.ymin,ct.ymax,5)); ct.axes(); ct.axisX(niceTicks(ct.xmin,ct.xmax,6)); ct.axisY(niceTicks(ct.ymin,ct.ymax,5));
+      const visTop=getAsymptotes(tree,f,ct.xmin,ct.xmax);
+      ratDrawAsymptoteLines(ct,visTop.vAsym,visTop.hAsym); ratLabelAsymptotes(ct,visTop.vAsym,visTop.hAsym);
+      ratDrawBreakingCurve(ct,f,COL.calc1,700,visTop.vAsym,breakX,2.4);
+      if(isFinite(fx)&&isFinite(dfx)){ ct.line(x-1.4,fx-dfx*1.4,x+1.4,fx+dfx*1.4,COL.coral,2); ct.dot(x,fx,COL.ink,5); }
+      A.crit.forEach(c=>{ const col=c.kind==='max'?COL.optim:c.kind==='min'?COL.calc2:COL.slate;
+        c.corner ? ratHollow(ct,c.x,c.y,col,5.5) : ct.dot(c.x,c.y,col,6); });
+
+      // ---- bottom: f'(x) [+ optional f''(x)] ----
+      const mustYbot=[0, ...A.infl.map(c=>fp(c.x))];
+      const [dylo,dyhi]=ratFramedYRange(fp,bxlo,bxhi,mustYbot,A.vAsym,featX);
+      const cb=bot.chart(); cb.setX(bxlo,bxhi).setY(Math.min(0,dylo),Math.max(0,dyhi)); cb.clear();
+      cb.gridlines(niceTicks(cb.xmin,cb.xmax,6),niceTicks(cb.ymin,cb.ymax,5)); cb.axes(); cb.axisX(niceTicks(cb.xmin,cb.xmax,6)); cb.axisY(niceTicks(cb.ymin,cb.ymax,5));
+      const visBot=getAsymptotes(tree,f,cb.xmin,cb.xmax);
+      ratDrawAsymptoteLines(cb,visBot.vAsym,[]);
+      cb.line(cb.xmin,0,cb.xmax,0,hexA(COL.faint,.5),1,[3,3]);
+      ratDrawBreakingCurve(cb,fp,COL.calc2,700,visBot.vAsym,breakX,2.2);
+      if(show2.get()=='1') ratDrawBreakingCurve(cb,f2,hexA(COL.calc3,.75),700,visBot.vAsym,breakX,1.8);
+      if(isFinite(dfx)) cb.dot(x,dfx,COL.coral,5);
+      A.crit.forEach(c=>{ const col=c.kind==='max'?COL.optim:c.kind==='min'?COL.calc2:COL.slate; cb.dot(c.x,0,col,5); });
+
+      // ---- readout: critical numbers + asymptotes ----
+      let rows='';
+      if(A.vAsym.length||A.hAsym.length){
+        rows+=`<span style="color:${COL.soft}">`;
+        if(A.vAsym.length) rows+='vertical asymptote'+(A.vAsym.length>1?'s':'')+': '+A.vAsym.map(v=>'x = '+M.round(v,3)).join(', ')+' &nbsp; ';
+        if(A.hAsym.length) rows+='horizontal asymptote'+(A.hAsym.length>1?'s':'')+': '+A.hAsym.map(v=>'y = '+M.round(v,3)).join(', ');
+        rows+='</span><br>';
+      }
+      rows += A.crit.length
+        ? A.crit.map(c=>{ const col=c.kind==='max'?COL.optim:c.kind==='min'?COL.calc2:COL.slate; const label=c.kind?('local '+c.kind):'flat (neither max nor min)';
+            return `<span style="color:${col}">critical number</span> at x = ${M.round(c.x,3)} (${label}), f = ${M.round(c.y,3)}`; }).join('<br>')
+        : 'no critical numbers in view (f′ = 0 has no solution here)';
+      info.innerHTML=rows;
     }
     render();
   }
@@ -1958,6 +2007,121 @@ add({ id:'definite-integral', cat:'calc1', tag:'interactive', title:'Definite In
   }
 });
 function parseAB(s){ const p=(s||'').split(/[\s,]+/).map(Number).filter(x=>!isNaN(x)); return p.length>=2?[p[0],p[1]]:null; }
+
+/* ----- Practice & Check — self-graded review quiz (Ch 1–5) ----- */
+add({ id:'practice-quiz', cat:'calc1', tag:'test yourself', title:'Practice & Check — Test Your Understanding', diff:'inter', ch:'Ch 1–5 review',
+  questions:['Which questions do you answer instantly, and which make you pause and think?','When you miss one, is it a slip, or a genuine gap in a rule you should revisit?','Could you explain your reasoning out loud to someone else right now?'],
+  blurb:'A short, auto-graded review spanning limits, derivatives, and integrals. Answer each question, then check — every question comes back with a worked explanation, right or wrong.',
+  build(host){
+    const QUIZ=[
+      { topic:'Limits', type:'mc', q:'lim<sub>x→2</sub> (x² − 4)/(x − 2) = ?', options:['Undefined','0','4','∞'], answer:2,
+        explain:'Factor the numerator: (x−2)(x+2)/(x−2) = x+2 for x≠2. As x→2, that approaches 2+2 = 4 — the hole at x=2 doesn\u2019t affect the limit.' },
+      { topic:'Derivatives', type:'numeric', q:'If f(x) = x³, find f′(2).', answer:12, tol:0.05,
+        explain:'By the power rule, f′(x) = 3x². At x = 2, that\u2019s 3(2²) = 3·4 = 12.' },
+      { topic:'Continuity', type:'mc', q:'f(a) is defined, lim<sub>x→a</sub>f(x) exists, but the two values don\u2019t match. This describes a:', options:['Removable discontinuity','Jump discontinuity','Infinite discontinuity','Point of continuity'], answer:0,
+        explain:'A removable discontinuity is exactly a "hole": the limit exists (the curve is clearly heading somewhere), but either f(a) is undefined or defined to a different value. Redefining f(a) to equal the limit would patch it.' },
+      { topic:'Derivatives', type:'numeric', q:'Find d/dx[sin(x)] at x = 0.', answer:1, tol:0.05,
+        explain:'d/dx[sin x] = cos x, and cos(0) = 1. Geometrically, the sine curve is steepest — slope exactly 1 — as it crosses the origin.' },
+      { topic:'Curve sketching', type:'mc', q:'For f(x) = x³ − 3x, the point x = −1 is a local:', options:['maximum','minimum','neither — just a flat spot','inflection point'], answer:0,
+        explain:'f′(x) = 3x² − 3 = 0 at x = ±1. f″(x) = 6x, so f″(−1) = −6 < 0 — concave down at a flat spot means a local <b>max</b> (first/second derivative test agree).' },
+      { topic:'Concavity', type:'mc', q:'An inflection point is where:', options:['f′(x) = 0','f″(x) = 0 and concavity actually changes sign there','f is discontinuous','the graph has a sharp corner'], answer:1,
+        explain:'f″ = 0 alone isn\u2019t enough — e.g. f(x)=x⁴ has f″(0)=0 but never changes concavity there, so x=0 isn\u2019t an inflection point. You need the sign of f″ to actually flip on either side.' },
+      { topic:'Integrals', type:'numeric', q:'Evaluate ∫₀¹ x² dx.', answer:0.3333, tol:0.01,
+        explain:'By the power rule for integrals, ∫x² dx = x³/3 + C. Evaluating from 0 to 1: 1³/3 − 0³/3 = 1/3 ≈ 0.333.' },
+      { topic:'Riemann sums', type:'mc', q:'As the number of subintervals n → ∞, a Riemann sum approaches:', options:['the derivative f′','the exact definite integral','zero, always','a number that depends only on n'], answer:1,
+        explain:'Riemann sums are approximations to signed area. As the rectangles get thinner (n → ∞) and the approximation error shrinks to 0, the sum converges to the exact value of the definite integral — this is essentially the definition of ∫ₐᵇ f dx.' },
+      { topic:'Implicit differentiation', type:'mc', q:'Implicit differentiation is the right tool when:', options:['y is already isolated as y = f(x)','the curve can\u2019t easily be solved for y as a function of x (e.g. x³+y³=6xy)','f is a simple polynomial in x alone','you only need the value of f, not its slope'], answer:1,
+        explain:'When a curve mixes x and y so that solving for y explicitly is hard or impossible, you differentiate both sides with respect to x — treating y as a function of x — and every y-term picks up a dy/dx factor by the chain rule. Then you solve algebraically for dy/dx.' },
+      { topic:'Definitions', type:'mc', q:'The derivative f′(a) is defined as the limit, as h → 0, of:', options:['the secant slope [f(a+h) − f(a)] / h','f(a+h) − f(a)','f(a) / h','the average value of f on [a, a+h]'], answer:0,
+        explain:'f′(a) = lim<sub>h→0</sub> [f(a+h) − f(a)]/h. That fraction is exactly the slope of the secant line through (a, f(a)) and (a+h, f(a+h)); as h shrinks to 0, the secant rotates into the tangent line.' },
+      { topic:'Asymptotes', type:'mc', q:'A rational function f = N(x)/D(x) has a vertical asymptote at x = a when:', options:['f(a) = 0','D(a) = 0 while N(a) ≠ 0 (the factor doesn\u2019t cancel)','f is a polynomial','f′(a) = 0'], answer:1,
+        explain:'A vertical asymptote is a genuine blow-up: the denominator vanishes at x=a but the numerator doesn\u2019t (so the factor can\u2019t be cancelled to leave a removable hole instead).' },
+      { topic:'Concavity', type:'mc', q:'If f″(x) > 0 on an interval, the graph of f is concave:', options:['up (like a cup ∪)','down (like a dome ∩)','neither — it\u2019s a straight line','impossible to say without f(x) itself'], answer:0,
+        explain:'A positive second derivative means the slope f′ is itself increasing — the curve bends upward like the inside of a cup. (Negative f″ ⇒ concave down, like a dome.)' }
+    ];
+    function mcControl(options){
+      const w=document.createElement('div'); w.style.cssText='display:flex;flex-direction:column;gap:8px;';
+      let sel=-1;
+      const paint=()=>btns.forEach((bb,ii)=>{
+        const on=ii===sel;
+        bb.style.borderColor = on? COL.calc1 : 'var(--line)';
+        bb.style.background = on? hexA(COL.calc1,.08) : 'var(--paper)';
+        bb.style.fontWeight = on? '700':'500';
+        bb.style.color = on? COL.calc1 : 'var(--ink)';
+      });
+      const btns=options.map((opt,idx)=>{
+        const b=document.createElement('button'); b.type='button'; b.innerHTML=opt;
+        b.style.cssText='text-align:left;padding:10px 14px;border:1px solid var(--line);border-radius:10px;background:var(--paper);color:var(--ink);font-size:.88rem;cursor:pointer;transition:.15s;line-height:1.4;';
+        b.onclick=()=>{ sel=idx; paint(); };
+        w.appendChild(b); return b;
+      });
+      w.get=()=>sel; w.set=(v)=>{ sel=v; paint(); };
+      return w;
+    }
+    host.appendChild(UI.note('Answer every question below, then press <b>Check my answers</b>. Multiple-choice questions grade by your selection; numeric answers allow a small rounding tolerance. Every question — right or wrong — shows a worked explanation.'));
+    const wrap=document.createElement('div'); wrap.style.cssText='max-width:760px;margin-top:18px;';
+    const qEls=[];
+    QUIZ.forEach((q,i)=>{
+      const card=document.createElement('div');
+      card.style.cssText='background:var(--white);border:1px solid var(--line);border-left:3px solid var(--line);border-radius:12px;padding:16px 18px;margin-bottom:14px;';
+      const tag=document.createElement('div'); tag.style.cssText='font-family:var(--mono);font-size:.66rem;color:var(--ink-faint);text-transform:uppercase;letter-spacing:.05em;margin-bottom:6px;';
+      tag.textContent=`Q${i+1} · ${q.topic}`;
+      const qtext=document.createElement('div'); qtext.style.cssText='font-size:.98rem;margin-bottom:12px;line-height:1.5;'; qtext.innerHTML=q.q;
+      card.append(tag,qtext);
+      let control;
+      if(q.type==='mc'){
+        control=mcControl(q.options);
+      } else {
+        control=UI.number({label:'Your answer',value:'',step:'any',onchange:()=>{}});
+      }
+      card.appendChild(control);
+      const fb=document.createElement('div'); fb.style.cssText='display:none;margin-top:12px;font-size:.85rem;line-height:1.55;padding-top:10px;border-top:1px dashed var(--line);';
+      card.appendChild(fb);
+      wrap.appendChild(card);
+      qEls.push({q,card,control,fb});
+    });
+    host.appendChild(wrap);
+    const scoreBox=UI.statsBox(); scoreBox.style.cssText='max-width:760px;margin-bottom:14px;';
+    const btnRow=UI.buttons([{label:'Check my answers',primary:true,onclick:grade},{label:'Reset',onclick:resetAll}]);
+    btnRow.style.cssText='max-width:760px;';
+    host.appendChild(btnRow);
+    host.appendChild(scoreBox);
+    function grade(){
+      let correct=0;
+      qEls.forEach(({q,card,control,fb})=>{
+        let ok=false, answeredMC=true;
+        if(q.type==='mc'){
+          const sel=control.get(); answeredMC=sel>=0; ok = sel===q.answer;
+        } else {
+          const raw=control.querySelector('input').value;
+          answeredMC = raw!=='';
+          const val=+raw; ok = answeredMC && isFinite(val) && Math.abs(val-q.answer)<=q.tol;
+        }
+        card.style.borderLeftColor = ok?COL.calc2:COL.coral;
+        fb.style.display='block';
+        let head = !answeredMC ? `<b style="color:${COL.amber}">No answer given.</b> ` : ok ? `<b style="color:${COL.calc2}">✓ Correct.</b> ` : `<b style="color:${COL.coral}">✗ Not quite.</b> `;
+        let answerNote='';
+        if(!ok){
+          answerNote = q.type==='mc'
+            ? ` <span style="color:${COL.soft}">(correct answer: ${q.options[q.answer]})</span>`
+            : ` <span style="color:${COL.soft}">(correct answer ≈ ${q.answer})</span>`;
+        }
+        fb.innerHTML = head + q.explain + answerNote;
+        if(ok) correct++;
+      });
+      scoreBox.set([{k:'score', v:`${correct} / ${QUIZ.length}`, accent:1},{k:'percent', v:Math.round(100*correct/QUIZ.length)+'%'}]);
+      qEls[0].card.scrollIntoView({behavior:'smooth',block:'nearest'});
+    }
+    function resetAll(){
+      qEls.forEach(({q,card,control,fb})=>{
+        card.style.borderLeftColor='var(--line)'; fb.style.display='none'; fb.innerHTML='';
+        if(q.type==='mc'){ control.set(-1); } else { control.querySelector('input').value=''; }
+      });
+      scoreBox.set([]);
+    }
+  }
+});
+
 /* =====================================================================
    CALCULUS II  (Chapters 6, 7, 8, 10, 11)
    ===================================================================== */
