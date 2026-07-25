@@ -2025,7 +2025,7 @@ function parseAB(s){ const p=(s||'').split(/[\s,]+/).map(Number).filter(x=>!isNa
    LaTeX ($...$ inline, or a standalone `expr` block) and rendered with
    KaTeX in \displaystyle, so fractions/limits/integrals sit at full size
    instead of being squeezed into cramped inline sub/sup text. */
-const QUIZ_POOL = [
+const QUIZ_POOL_CALC1 = [
   { topic:'Limits', type:'mc', stem:'Evaluate the limit:', expr:'\\lim_{x\\to 2}\\dfrac{x^2-4}{x-2}',
     options:['Undefined','$0$','$4$','$\\infty$'], answer:2,
     explain:'Factor the numerator: $\\dfrac{(x-2)(x+2)}{x-2}=x+2$ for $x\\neq 2$. As $x\\to 2$, that approaches $2+2=4$ — the hole at $x=2$ doesn\u2019t affect the limit.' },
@@ -2095,19 +2095,20 @@ const QUIZ_POOL = [
     explain:'L\u2019Hôpital\u2019s Rule is specifically a fix for indeterminate forms — it lets you replace $f/g$ with $f\'/g\'$ only when direct substitution gives $0/0$ or $\\infty/\\infty$, not for an ordinary limit that already evaluates cleanly.' }
 ];
 function shuffleArr(arr){ const a=arr.slice(); for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
-add({ id:'practice-quiz', cat:'calc1', tag:'test yourself', title:'Practice & Check — Test Your Understanding', diff:'inter', ch:'Ch 1–5 review',
-  questions:['Which questions do you answer instantly, and which make you pause and think?','When you miss one, is it a slip, or a genuine gap in a rule you should revisit?','Could you explain your reasoning out loud to someone else right now?'],
-  blurb:'A short, auto-graded review spanning limits, derivatives, and integrals, drawn from a larger pool — press Reset for a fresh set of questions. Answer each question, then check — every question comes back with a worked explanation, right or wrong.',
-  build(host){
-    const N_QUESTIONS=12;
+/* Reusable "Practice & Check" quiz builder — used for the Calc I, II, and III
+   review applets. Each Reset draws a fresh random subset from the pool (never
+   repeating the immediately-previous set), math renders via KaTeX in
+   \displaystyle, and numeric answers use a plain arrow-free text field. */
+function makeQuizBuild(pool, nQuestions=12){
+  return function build(host){
     let lastSetKey='';
     function drawQuiz(){
       let picks;
       do{
-        picks=shuffleArr(QUIZ_POOL.map((q,i)=>i)).slice(0,Math.min(N_QUESTIONS,QUIZ_POOL.length));
-      } while(QUIZ_POOL.length>N_QUESTIONS && picks.slice().sort((a,b)=>a-b).join(',')===lastSetKey);
+        picks=shuffleArr(pool.map((q,i)=>i)).slice(0,Math.min(nQuestions,pool.length));
+      } while(pool.length>nQuestions && picks.slice().sort((a,b)=>a-b).join(',')===lastSetKey);
       lastSetKey=picks.slice().sort((a,b)=>a-b).join(',');
-      return picks.map(i=>QUIZ_POOL[i]);
+      return picks.map(i=>pool[i]);
     }
     function mcControl(options){
       const w=document.createElement('div'); w.style.cssText='display:flex;flex-direction:column;gap:8px;';
@@ -2202,7 +2203,12 @@ add({ id:'practice-quiz', cat:'calc1', tag:'test yourself', title:'Practice & Ch
       qEls[0].card.scrollIntoView({behavior:'smooth',block:'nearest'});
     }
     buildSet();
-  }
+  };
+}
+add({ id:'practice-quiz', cat:'calc1', tag:'test yourself', title:'Practice & Check — Test Your Understanding', diff:'inter', ch:'Ch 1–5 review',
+  questions:['Which questions do you answer instantly, and which make you pause and think?','When you miss one, is it a slip, or a genuine gap in a rule you should revisit?','Could you explain your reasoning out loud to someone else right now?'],
+  blurb:'A short, auto-graded review spanning limits, derivatives, and integrals, drawn from a larger pool — press Reset for a fresh set of questions. Answer each question, then check — every question comes back with a worked explanation, right or wrong.',
+  build: makeQuizBuild(QUIZ_POOL_CALC1, 12)
 });
 
 /* =====================================================================
@@ -2905,6 +2911,76 @@ add({ id:'polar-curves', cat:'calc2', tag:'explore', title:'Polar Curve Explorer
     render();
   }
 });
+
+/* ----- Practice & Check — self-graded review quiz (Ch 6–8, 10–11) ----- */
+const QUIZ_POOL_CALC2 = [
+  { topic:'Area between curves', type:'numeric', stem:'Find the area between $y=\\sqrt{x}$ and $y=x^2$ on $[0,1]$:', expr:'\\int_0^1\\left(\\sqrt{x}-x^2\\right)dx', answer:0.3333, tol:0.01,
+    explain:'$\\int\\sqrt{x}\\,dx=\\dfrac{2}{3}x^{3/2}$ and $\\int x^2\\,dx=\\dfrac{x^3}{3}$. Evaluating from $0$ to $1$: $\\dfrac{2}{3}-\\dfrac{1}{3}=\\dfrac{1}{3}\\approx 0.333$.' },
+  { topic:'Volumes', type:'mc', stem:'Rotating a region about the $x$-axis, the disk method gives:', options:['$\\displaystyle V=\\int_a^b \\pi\\,[f(x)]^2\\,dx$','$\\displaystyle V=\\int_a^b 2\\pi x f(x)\\,dx$','$\\displaystyle V=\\int_a^b f(x)\\,dx$','$\\displaystyle V=\\int_a^b \\pi\\,[f(x)-g(x)]\\,dx$'], answer:0,
+    explain:'Each thin slice perpendicular to the axis is a disk of radius $f(x)$, hence area $\\pi[f(x)]^2$, stacked up via $\\int_a^b(\\cdot)\\,dx$.' },
+  { topic:'Volumes', type:'mc', stem:'The cylindrical shell method — $V=\\int_a^b 2\\pi(\\text{radius})(\\text{height})\\,dx$ — is most useful when:', options:['solving for $x$ in terms of $y$ would be awkward, but the region is easy to describe in terms of $x$','the region is a perfect circle','you can only integrate with respect to $y$','the axis of rotation must lie inside the region'], answer:0,
+    explain:'Shells let you keep integrating in the "easy" variable — you never have to invert the function to solve for $x$ in terms of $y$, which the washer method around a vertical axis would require.' },
+  { topic:'Volumes', type:'numeric', stem:'Rotate the region between $y=x$ and $y=x^2$ on $[0,1]$ about the $x$-axis. Find the volume (washer method):', expr:'\\pi\\int_0^1\\left(x^2-x^4\\right)dx', answer:0.4189, tol:0.01,
+    explain:'$V=\\pi\\int_0^1(x^2-x^4)\\,dx=\\pi\\left[\\dfrac{1}{3}-\\dfrac{1}{5}\\right]=\\pi\\cdot\\dfrac{2}{15}\\approx 0.419$.' },
+  { topic:'Arc length', type:'mc', stem:'The arc length of $y=f(x)$ on $[a,b]$ is:', options:['$\\displaystyle\\int_a^b \\sqrt{1+[f\'(x)]^2}\\,dx$','$\\displaystyle\\int_a^b f(x)\\,dx$','$\\displaystyle\\int_a^b [f(x)]^2\\,dx$','$\\displaystyle\\int_a^b f\'(x)\\,dx$'], answer:0,
+    explain:'Each infinitesimal arc piece has length $ds=\\sqrt{dx^2+dy^2}=\\sqrt{1+(dy/dx)^2}\\,dx$ by the Pythagorean theorem — summing those gives the formula.' },
+  { topic:'Work', type:'numeric', stem:'A spring has constant $k=200$ N/m. How much work (in J) is needed to stretch it $0.5$ m from natural length?', answer:25, tol:0.5,
+    explain:'By Hooke\u2019s Law the force is $F(x)=kx$, so $W=\\int_0^{0.5}200x\\,dx=100\\left[x^2\\right]_0^{0.5}=100(0.25)=25$ J.' },
+  { topic:'Integration by parts', type:'mc', stem:'Integration by parts, $\\int u\\,dv = uv - \\int v\\,du$, comes directly from:', options:['the product rule for differentiation, rearranged and integrated','the chain rule','the quotient rule','the FTC by itself, with no other rule needed'], answer:0,
+    explain:'Start from $(uv)\'=u\'v+uv\'$, integrate both sides, and rearrange — that single identity is the entire justification for the by-parts formula.' },
+  { topic:'Integration by parts', type:'numeric', stem:'Evaluate:', expr:'\\int_0^1 xe^x\\,dx', answer:1, tol:0.05,
+    explain:'With $u=x,\\ dv=e^x\\,dx$: $\\int xe^x\\,dx = xe^x-e^x+C$. Evaluating from $0$ to $1$: $(e-e)-(0-1)=0-(-1)=1$.' },
+  { topic:'Trig substitution', type:'mc', stem:'For an integrand containing $\\sqrt{a^2-x^2}$, the standard substitution is:', options:['$x=a\\sin\\theta$','$x=a\\tan\\theta$','$x=a\\sec\\theta$','$x=a\\cos^2\\theta$'], answer:0,
+    explain:'$x=a\\sin\\theta$ makes $a^2-x^2=a^2(1-\\sin^2\\theta)=a^2\\cos^2\\theta$, turning the square root into the clean expression $a\\cos\\theta$ (for the right range of $\\theta$).' },
+  { topic:'Trig substitution', type:'mc', stem:'For an integrand containing $\\sqrt{x^2+a^2}$, the standard substitution is:', options:['$x=a\\tan\\theta$','$x=a\\sin\\theta$','$x=a\\sec\\theta$','no substitution is ever needed'], answer:0,
+    explain:'$x=a\\tan\\theta$ makes $x^2+a^2=a^2(\\tan^2\\theta+1)=a^2\\sec^2\\theta$, so the square root simplifies to $a\\sec\\theta$.' },
+  { topic:'Partial fractions', type:'mc', stem:'Partial fraction decomposition is the right tool to integrate a rational function when:', options:['the numerator\u2019s degree is less than the denominator\u2019s, and the denominator factors nicely','the function is already a polynomial','the denominator never factors','the numerator and denominator are identical'], answer:0,
+    explain:'Splitting into simple fractions (one per linear or irreducible-quadratic factor of the denominator) only works cleanly once you have a proper rational function whose denominator you can actually factor.' },
+  { topic:'Improper integrals', type:'mc', stem:'The improper integral $\\displaystyle\\int_1^\\infty \\frac{1}{x^p}\\,dx$ converges exactly when:', options:['$p>1$','$p<1$','$p=1$','for every value of $p$'], answer:0,
+    explain:'This is the p-integral test: the antiderivative $\\dfrac{x^{1-p}}{1-p}$ only tends to a finite limit as $x\\to\\infty$ when the exponent $1-p$ is negative, i.e. $p>1$.' },
+  { topic:'Improper integrals', type:'numeric', stem:'Evaluate:', expr:'\\int_1^\\infty \\frac{1}{x^2}\\,dx', answer:1, tol:0.05,
+    explain:'$\\int\\frac{1}{x^2}\\,dx=-\\dfrac{1}{x}+C$. As the upper limit $\\to\\infty$, $-1/x\\to 0$, so the integral is $0-(-1)=1$.' },
+  { topic:'Sequences', type:'mc', stem:'A sequence $a_n$ converges when:', options:['$\\lim_{n\\to\\infty}a_n$ exists and is finite','it is merely bounded','it is merely monotonic','$a_n>0$ for every $n$'], answer:0,
+    explain:'Convergence is precisely about the limit existing (and being a finite number) — boundedness and monotonicity are useful sufficient conditions in some theorems, but not the definition itself.' },
+  { topic:'Sequences', type:'numeric', stem:'Find the limit of the sequence $a_n=\\dfrac{n}{n+1}$ as $n\\to\\infty$.', answer:1, tol:0.02,
+    explain:'Divide top and bottom by $n$: $\\dfrac{1}{1+1/n}\\to \\dfrac{1}{1+0}=1$.' },
+  { topic:'Geometric series', type:'numeric', stem:'Find the sum:', expr:'\\sum_{n=0}^{\\infty}\\left(\\frac{1}{3}\\right)^n', answer:1.5, tol:0.02,
+    explain:'A geometric series $\\sum ar^n$ with $|r|<1$ sums to $\\dfrac{a}{1-r}$. Here $a=1,\\ r=\\frac13$, so the sum is $\\dfrac{1}{1-1/3}=\\dfrac{3}{2}$.' },
+  { topic:'Geometric series', type:'mc', stem:'The geometric series $\\sum ar^{n}$ converges exactly when:', options:['$|r|<1$','$|r|\\le 1$','$r>0$','it always converges, for any $r$'], answer:0,
+    explain:'The partial sums involve $r^n$, which only shrinks to $0$ (giving a finite limit) when $|r|<1$; at $|r|=1$ or beyond, the terms don\u2019t decay and the series fails to converge.' },
+  { topic:'p-series', type:'mc', stem:'The p-series $\\sum \\dfrac{1}{n^p}$ converges when:', options:['$p>1$','$p<1$','$p=1$','never, for any $p$'], answer:0,
+    explain:'Same threshold as the improper integral test it mirrors: convergence requires $p>1$; at $p=1$ it\u2019s exactly the divergent harmonic series.' },
+  { topic:'Harmonic series', type:'mc', stem:'The harmonic series $\\sum \\dfrac{1}{n}$:', options:['diverges, even though the individual terms $\\to 0$','converges to $1$','converges to $\\ln 2$','converges to $\\pi^2/6$'], answer:0,
+    explain:'This is the classic counterexample showing that terms shrinking to zero is <em>not</em> enough to guarantee convergence — the harmonic series still diverges (very slowly, but without bound).' },
+  { topic:'Alternating series', type:'mc', stem:'The Alternating Series Test says $\\sum (-1)^n b_n$ converges if:', options:['$b_n$ is eventually decreasing and $b_n\\to 0$','$b_n\\to 0$ alone is enough','$b_n$ is merely bounded','$b_n$ is positive and constant'], answer:0,
+    explain:'Both conditions are needed: decreasing terms make the partial sums oscillate with shrinking swings, and $b_n\\to 0$ makes those swings shrink to nothing.' },
+  { topic:'Ratio test', type:'mc', stem:'The Ratio Test computes $L=\\lim_{n\\to\\infty}\\left|\\dfrac{a_{n+1}}{a_n}\\right|$. The series converges absolutely when:', options:['$L<1$','$L>1$','$L=1$','$L=0$ is the only convergent case'], answer:0,
+    explain:'$L<1$ means consecutive terms are eventually shrinking by a fixed ratio, which forces the terms toward $0$ fast enough (geometrically) for absolute convergence. $L=1$ is inconclusive — the test simply doesn\u2019t decide that case.' },
+  { topic:'Integral test', type:'mc', stem:'The Integral Test compares $\\sum a_n$ to $\\int f(x)\\,dx$ when:', options:['$f$ is positive, continuous, and decreasing, with $f(n)=a_n$','$f$ is any continuous function at all','$a_n$ must be geometric','the series must already be alternating'], answer:0,
+    explain:'Those three conditions on $f$ let you sandwich the series\u2019 partial sums between values of the integral — without them, the comparison breaks down.' },
+  { topic:'Absolute convergence', type:'mc', stem:'If $\\sum |a_n|$ converges, then $\\sum a_n$:', options:['converges absolutely (so it also just converges)','necessarily diverges','converges only conditionally','tells us nothing about $\\sum a_n$'], answer:0,
+    explain:'Absolute convergence is the stronger condition — if the series of absolute values converges, the original series is guaranteed to converge too (though the reverse isn\u2019t true).' },
+  { topic:'Comparison test', type:'mc', stem:'Direct Comparison Test: if $0\\le a_n\\le b_n$ for all $n$, and $\\sum b_n$ converges, then:', options:['$\\sum a_n$ converges too','$\\sum a_n$ must diverge','no conclusion is possible','$a_n=b_n$ for large $n$'], answer:0,
+    explain:'A nonnegative series that\u2019s always dominated by a convergent series can\u2019t possibly add up to infinity itself — it\u2019s squeezed underneath a finite ceiling.' },
+  { topic:'Power series', type:'mc', stem:'A power series $\\sum c_n(x-a)^n$ converges absolutely:', options:['strictly inside its radius of convergence, $|x-a|<R$','only at the single point $x=a$','for every real number $x$, always','only when every $c_n>0$'], answer:0,
+    explain:'Every power series has a radius $R$ (possibly $0$ or $\\infty$): absolute convergence is guaranteed inside $|x-a|<R$, divergence is guaranteed outside, and the two endpoints need to be checked separately.' },
+  { topic:'Taylor series', type:'numeric', stem:'The Maclaurin (Taylor, centered at $0$) series for $e^x$ has $x^3$-coefficient:', answer:0.1667, tol:0.01,
+    explain:'The Taylor coefficient of $x^n$ is $\\dfrac{f^{(n)}(0)}{n!}$. For $f(x)=e^x$, every derivative at $0$ is $1$, so the $x^3$ coefficient is $\\dfrac{1}{3!}=\\dfrac{1}{6}\\approx 0.167$.' },
+  { topic:'Taylor series', type:'mc', stem:'The Maclaurin series for $\\cos x$ starts:', options:['$1-\\dfrac{x^2}{2!}+\\dfrac{x^4}{4!}-\\cdots$','$x-\\dfrac{x^3}{3!}+\\cdots$','$1+x+\\dfrac{x^2}{2!}+\\cdots$','$\\dfrac{1}{1-x}$'], answer:0,
+    explain:'$\\cos x$ is even, so only even powers of $x$ appear, alternating in sign — that\u2019s exactly the $\\dfrac{x^2}{2!},\\dfrac{x^4}{4!},\\ldots$ pattern (compare to $\\sin x$, which is the odd-power version).' },
+  { topic:'Parametric curves', type:'mc', stem:'For a curve $x=f(t),\\ y=g(t)$, the slope $\\dfrac{dy}{dx}$ equals:', options:['$\\dfrac{dy/dt}{dx/dt}$','$\\dfrac{dx/dt}{dy/dt}$','$f\'(t)\\,g\'(t)$','$g(t)/f(t)$'], answer:0,
+    explain:'By the chain rule, $\\dfrac{dy}{dt}=\\dfrac{dy}{dx}\\cdot\\dfrac{dx}{dt}$, so solving for the slope gives $\\dfrac{dy}{dx}=\\dfrac{dy/dt}{dx/dt}$ — provided $dx/dt\\neq 0$.' },
+  { topic:'Polar area', type:'mc', stem:'The area enclosed by a polar curve $r=f(\\theta)$ from $\\theta=a$ to $\\theta=b$ is:', options:['$\\dfrac12\\displaystyle\\int_a^b [f(\\theta)]^2\\,d\\theta$','$\\displaystyle\\int_a^b f(\\theta)\\,d\\theta$','$\\displaystyle\\int_a^b [f(\\theta)]^2\\,d\\theta$','$2\\displaystyle\\int_a^b f(\\theta)\\,d\\theta$'], answer:0,
+    explain:'Each thin polar "wedge" is nearly a triangle/sector of area $\\frac12 r^2\\,d\\theta$ — summing those sectors over the angle range gives the $\\frac12\\int r^2\\,d\\theta$ formula.' },
+  { topic:'Polar area', type:'numeric', stem:'Find the area enclosed by the circle $r=2$ (one full circle).', answer:12.566, tol:0.1,
+    explain:'Using the polar area formula: $\\frac12\\int_0^{2\\pi}2^2\\,d\\theta=\\frac12(4)(2\\pi)=4\\pi\\approx 12.566$ — matching the familiar $\\pi r^2=\\pi(2)^2=4\\pi$.' }
+];
+add({ id:'practice-quiz-calc2', cat:'calc2', tag:'test yourself', title:'Practice & Check — Test Your Understanding', diff:'inter', ch:'Ch 6–8, 10–11 review',
+  questions:['Which topics — volumes, series convergence, polar curves — feel shakiest right now?','When a series-test question trips you up, is it the test\u2019s conditions you forgot, or the arithmetic?','Could you sketch the region or curve for a question before computing anything?'],
+  blurb:'A short, auto-graded review spanning volumes, integration techniques, series, and polar/parametric curves, drawn from a larger pool — press Reset for a fresh set of questions.',
+  build: makeQuizBuild(QUIZ_POOL_CALC2, 12)
+});
+
 /* =====================================================================
    CALCULUS III  (Chapters 12–15)
    ===================================================================== */
@@ -3425,6 +3501,76 @@ add({ id:'lagrange', cat:'calc3', tag:'explore', title:'Lagrange Multipliers', d
     render();
   }
 });
+
+/* ----- Practice & Check — self-graded review quiz (Ch 12–15) ----- */
+const QUIZ_POOL_CALC3 = [
+  { topic:'Dot product', type:'mc', stem:'For vectors $\\mathbf{a}$ and $\\mathbf{b}$, since $\\mathbf{a}\\cdot\\mathbf{b}=|\\mathbf{a}||\\mathbf{b}|\\cos\\theta$, two nonzero vectors are orthogonal exactly when:', options:['$\\mathbf{a}\\cdot\\mathbf{b}=0$','$\\mathbf{a}\\times\\mathbf{b}=\\mathbf{0}$','$|\\mathbf{a}|=|\\mathbf{b}|$','$\\mathbf{a}\\cdot\\mathbf{b}=1$'], answer:0,
+    explain:'$\\cos\\theta=0$ exactly when $\\theta=90°$, and that happens precisely when the dot product itself is $0$ (assuming neither vector is the zero vector).' },
+  { topic:'Dot product', type:'numeric', stem:'Find $\\mathbf{a}\\cdot\\mathbf{b}$ for $\\mathbf{a}=(1,2,3)$ and $\\mathbf{b}=(4,-1,2)$.', answer:8, tol:0.1,
+    explain:'$\\mathbf{a}\\cdot\\mathbf{b}=1(4)+2(-1)+3(2)=4-2+6=8$ — multiply matching components and add.' },
+  { topic:'Cross product', type:'mc', stem:'The cross product $\\mathbf{a}\\times\\mathbf{b}$ produces a vector that is:', options:['perpendicular to both $\\mathbf{a}$ and $\\mathbf{b}$','parallel to $\\mathbf{a}$','a scalar, not a vector','always the zero vector'], answer:0,
+    explain:'Unlike the dot product (which returns a number), the cross product returns a new vector — one normal to the plane spanned by $\\mathbf{a}$ and $\\mathbf{b}$, with magnitude equal to the area of the parallelogram they span.' },
+  { topic:'Cross product', type:'numeric', stem:'Find $|\\mathbf{a}\\times\\mathbf{b}|$ for $\\mathbf{a}=(1,0,0)$ and $\\mathbf{b}=(0,1,0)$.', answer:1, tol:0.05,
+    explain:'$\\mathbf{a}\\times\\mathbf{b}=(0,0,1)$, which has magnitude $1$ — the two unit vectors are perpendicular, so the "parallelogram" they span is a unit square.' },
+  { topic:'Triple product', type:'mc', stem:'The scalar triple product $\\mathbf{a}\\cdot(\\mathbf{b}\\times\\mathbf{c})$ gives (up to a sign):', options:['the volume of the parallelepiped spanned by $\\mathbf{a},\\mathbf{b},\\mathbf{c}$','the area of the triangle they span','always zero, for any vectors','the angle between $\\mathbf{a}$ and $\\mathbf{b}$'], answer:0,
+    explain:'$\\mathbf{b}\\times\\mathbf{c}$ gives a vector whose magnitude is the base parallelogram\u2019s area; dotting with $\\mathbf{a}$ projects $\\mathbf{a}$ onto that normal direction, effectively multiplying by height — base times height is volume.' },
+  { topic:'Lines in space', type:'mc', stem:'A line through point $P_0$ (position vector $\\mathbf{r}_0$) in the direction of $\\mathbf{v}$ has vector equation:', options:['$\\mathbf{r}(t)=\\mathbf{r}_0+t\\mathbf{v}$','$\\mathbf{r}(t)=\\mathbf{r}_0\\cdot t\\mathbf{v}$','$\\mathbf{r}(t)=t\\mathbf{r}_0+\\mathbf{v}$','$\\mathbf{r}(t)=\\mathbf{r}_0\\times\\mathbf{v}$'], answer:0,
+    explain:'Starting at $\\mathbf{r}_0$ and adding a scalar multiple of the direction vector $\\mathbf{v}$ sweeps out every point on the line as $t$ ranges over all reals.' },
+  { topic:'Planes', type:'mc', stem:'A plane with normal vector $\\mathbf{n}=(a,b,c)$ through the point $(x_0,y_0,z_0)$ has equation:', options:['$a(x-x_0)+b(y-y_0)+c(z-z_0)=0$','$ax+by+cz=0$ always','$x_0+y_0+z_0=0$','$ax_0+by_0+cz_0=1$'], answer:0,
+    explain:'The vector from $(x_0,y_0,z_0)$ to any point $(x,y,z)$ on the plane must be perpendicular to the normal $\\mathbf{n}$ — setting that dot product to zero gives exactly this equation.' },
+  { topic:'Vector functions', type:'mc', stem:'For a space curve $\\mathbf{r}(t)=(f(t),g(t),h(t))$, the derivative $\\mathbf{r}\'(t)$ is:', options:['tangent to the curve traced out by $\\mathbf{r}(t)$','always perpendicular to the curve','a scalar, not a vector','equal to $|\\mathbf{r}(t)|$'], answer:0,
+    explain:'Just as in single-variable calculus the derivative gives the tangent slope, here $\\mathbf{r}\'(t)$ points along the direction the curve is instantaneously heading — its tangent vector.' },
+  { topic:'Velocity & speed', type:'numeric', stem:'For $\\mathbf{r}(t)=(t^2,t^3)$, find the speed $|\\mathbf{r}\'(t)|$ at $t=1$.', answer:3.606, tol:0.03,
+    explain:'$\\mathbf{r}\'(t)=(2t,3t^2)$, so at $t=1$: $\\mathbf{r}\'(1)=(2,3)$, and speed $=\\sqrt{2^2+3^2}=\\sqrt{13}\\approx 3.606$.' },
+  { topic:'Arc length in space', type:'mc', stem:'The arc length of $\\mathbf{r}(t)$ for $t\\in[a,b]$ is:', options:['$\\displaystyle\\int_a^b |\\mathbf{r}\'(t)|\\,dt$','$\\displaystyle\\int_a^b \\mathbf{r}(t)\\,dt$','$|\\mathbf{r}(b)-\\mathbf{r}(a)|$','$\\displaystyle\\int_a^b \\mathbf{r}\'(t)\\,dt$'], answer:0,
+    explain:'This is exactly the 3D analogue of the single-variable arc-length formula: integrate the speed $|\\mathbf{r}\'(t)|$ over the time interval to accumulate total distance traveled.' },
+  { topic:'Partial derivatives', type:'mc', stem:'For $f(x,y)$, the partial $\\partial f/\\partial x$ is computed by:', options:['differentiating with respect to $x$, treating $y$ as a constant','differentiating with respect to both variables simultaneously','setting $y=0$ before differentiating','integrating with respect to $y$ first'], answer:0,
+    explain:'A partial derivative freezes every other variable and applies ordinary single-variable differentiation to the one variable of interest.' },
+  { topic:'Partial derivatives', type:'numeric', stem:'For $f(x,y)=x^2y^3$, find $f_x(1,2)$.', answer:16, tol:0.5,
+    explain:'$f_x=2xy^3$ (treating $y$ as constant). At $(1,2)$: $2(1)(2^3)=2\\cdot 8=16$.' },
+  { topic:'Clairaut\u2019s theorem', type:'mc', stem:'Clairaut\u2019s Theorem states that, for a function with continuous second partials:', options:['$f_{xy}=f_{yx}$ — the mixed partials agree','$f_x=f_y$ everywhere','$f_{xx}=f_{yy}$ everywhere','partial derivatives never actually exist'], answer:0,
+    explain:'Whether you differentiate with respect to $x$ first then $y$, or $y$ first then $x$, you land on the same mixed partial — provided both are continuous.' },
+  { topic:'Gradient', type:'mc', stem:'The gradient $\\nabla f$ at a point always points in the direction of:', options:['steepest ascent of $f$ from that point','steepest descent only','zero rate of change','the positive $x$-axis, always'], answer:0,
+    explain:'Among all possible directions $\\mathbf{u}$, the directional derivative $\\nabla f\\cdot\\mathbf{u}$ is maximized exactly when $\\mathbf{u}$ points the same way as $\\nabla f$ — that\u2019s the direction of fastest increase.' },
+  { topic:'Gradient', type:'numeric', stem:'For $f(x,y)=x^2+y^2$, find $|\\nabla f|$ at $(3,4)$.', answer:10, tol:0.1,
+    explain:'$\\nabla f=(2x,2y)$, so at $(3,4)$: $\\nabla f=(6,8)$, and $|\\nabla f|=\\sqrt{6^2+8^2}=\\sqrt{100}=10$.' },
+  { topic:'Directional derivative', type:'mc', stem:'The directional derivative $D_{\\mathbf{u}}f=\\nabla f\\cdot\\mathbf{u}$ (with $\\mathbf{u}$ a unit vector) is largest when:', options:['$\\mathbf{u}$ points in the same direction as $\\nabla f$','$\\mathbf{u}$ is perpendicular to $\\nabla f$','$\\mathbf{u}$ points opposite to $\\nabla f$','$\\mathbf{u}$ is the zero vector'], answer:0,
+    explain:'$\\nabla f\\cdot\\mathbf{u}=|\\nabla f|\\cos\\theta$ for the angle $\\theta$ between them, and $\\cos\\theta$ is maximized (at $1$) exactly when $\\theta=0$ — i.e. $\\mathbf{u}$ aligned with $\\nabla f$.' },
+  { topic:'Tangent planes', type:'mc', stem:'The tangent plane to $z=f(x,y)$ at $(x_0,y_0)$ is:', options:['$z=f(x_0,y_0)+f_x(x_0,y_0)(x-x_0)+f_y(x_0,y_0)(y-y_0)$','$z=f(x_0,y_0)$, a constant','$z=f_x(x_0,y_0)\\cdot f_y(x_0,y_0)$','$z=\\nabla f(x_0,y_0)$'], answer:0,
+    explain:'This is the direct 2-variable analogue of a tangent line: match the value <em>and</em> both partial-derivative slopes at the point of tangency, giving a linear approximation to the surface.' },
+  { topic:'Second derivative test', type:'mc', stem:'At a critical point of $f(x,y)$, if the discriminant $D=f_{xx}f_{yy}-f_{xy}^2$ is negative, the point is:', options:['a saddle point','a local minimum','a local maximum','not actually a critical point'], answer:0,
+    explain:'Negative $D$ means the surface curves upward in one direction and downward in a perpendicular direction right at that flat spot — the signature shape of a saddle.' },
+  { topic:'Second derivative test', type:'numeric', stem:'For $f(x,y)=x^2+y^2$, find the discriminant $D=f_{xx}f_{yy}-f_{xy}^2$ at the critical point $(0,0)$.', answer:4, tol:0.2,
+    explain:'$f_{xx}=2,\\ f_{yy}=2,\\ f_{xy}=0$, so $D=2\\cdot2-0^2=4$. Since $D>0$ and $f_{xx}>0$, $(0,0)$ is a local minimum — matching the obvious bowl shape of $x^2+y^2$.' },
+  { topic:'Second derivative test', type:'numeric', stem:'For $f(x,y)=x^2-y^2$ (a saddle at the origin), find $D$ at $(0,0)$.', answer:-4, tol:0.3,
+    explain:'$f_{xx}=2,\\ f_{yy}=-2,\\ f_{xy}=0$, so $D=2(-2)-0^2=-4$. Negative $D$ confirms the saddle shape.' },
+  { topic:'Lagrange multipliers', type:'mc', stem:'To optimize $f(x,y)$ subject to a constraint $g(x,y)=k$, the Lagrange condition at the optimum is:', options:['$\\nabla f=\\lambda\\nabla g$ for some scalar $\\lambda$','$\\nabla f=\\nabla g$, always exactly','$f=\\lambda g$','$\\nabla f\\cdot\\nabla g=0$'], answer:0,
+    explain:'At a constrained extremum, the level curve of $f$ must be tangent to the constraint curve $g=k$ — and tangent curves share a common normal direction, so their gradients are parallel (scalar multiples of each other).' },
+  { topic:'Double integrals', type:'mc', stem:'A double integral $\\displaystyle\\iint_R f(x,y)\\,dA$ over a region $R$ computes:', options:['the signed volume between the surface $z=f(x,y)$ and the region $R$','the arc length of the boundary of $R$','the area of $R$, regardless of what $f$ is','a number that never depends on $f$'], answer:0,
+    explain:'Just as a single integral gives signed area under a curve, a double integral gives signed volume under a surface — summing $f(x,y)$ over infinitesimal patches of area $dA$.' },
+  { topic:'Double integrals', type:'numeric', stem:'Evaluate:', expr:'\\int_0^1\\int_0^1 xy\\,dy\\,dx', answer:0.25, tol:0.02,
+    explain:'Inner integral over $y$: $\\int_0^1 xy\\,dy=x\\cdot\\dfrac12$. Then $\\int_0^1 \\dfrac{x}{2}\\,dx=\\dfrac12\\cdot\\dfrac12=\\dfrac14$.' },
+  { topic:'Fubini\u2019s theorem', type:'mc', stem:'Fubini\u2019s Theorem lets us evaluate a double integral over a rectangle as:', options:['an iterated integral, computed in either order','only in one fixed order ($x$ then $y$)','a limit of Riemann sums, but never as an iterated integral','the product of two unrelated single integrals of any functions'], answer:0,
+    explain:'Provided $f$ is continuous (or the integral converges appropriately), Fubini guarantees integrating with respect to $x$ first or $y$ first gives the exact same answer.' },
+  { topic:'Polar double integrals', type:'mc', stem:'Converting $\\displaystyle\\iint_R f(x,y)\\,dA$ to polar coordinates, the area element $dA$ becomes:', options:['$r\\,dr\\,d\\theta$','$dr\\,d\\theta$','$r^2\\,dr\\,d\\theta$','$dr^2\\,d\\theta$'], answer:0,
+    explain:'The extra factor of $r$ comes from the Jacobian of the polar-coordinate transformation — a thin polar "rectangle" has width $dr$ but arc-length $r\\,d\\theta$ (larger farther from the origin), giving area $r\\,dr\\,d\\theta$.' },
+  { topic:'Cylindrical coordinates', type:'mc', stem:'Cylindrical coordinates $(r,\\theta,z)$ relate to Cartesian coordinates by:', options:['$x=r\\cos\\theta,\\ y=r\\sin\\theta,\\ z=z$','$x=r,\\ y=\\theta,\\ z=z$','$x=\\rho\\sin\\phi\\cos\\theta$ (that\u2019s spherical, not cylindrical)','$x=r\\theta,\\ y=r,\\ z=z$'], answer:0,
+    explain:'Cylindrical coordinates just swap the $x,y$ plane for polar coordinates while keeping $z$ exactly as in Cartesian — it\u2019s "polar coordinates with height."' },
+  { topic:'Spherical coordinates', type:'mc', stem:'In spherical coordinates $(\\rho,\\theta,\\phi)$, the volume element $dV$ equals:', options:['$\\rho^2\\sin\\phi\\,d\\rho\\,d\\theta\\,d\\phi$','$\\rho\\,d\\rho\\,d\\theta\\,d\\phi$','$\\sin\\phi\\,d\\rho\\,d\\theta\\,d\\phi$','$d\\rho\\,d\\theta\\,d\\phi$, with no extra factor'], answer:0,
+    explain:'The $\\rho^2\\sin\\phi$ factor is the Jacobian of the spherical transformation — a thin spherical "box" is wider both as $\\rho$ grows and as you move away from the poles (where $\\sin\\phi$ is largest, near the equator).' },
+  { topic:'Triple integrals', type:'mc', stem:'A triple integral $\\displaystyle\\iiint_E f(x,y,z)\\,dV$ over a solid $E$, when $f=1$ everywhere, computes:', options:['the volume of $E$','the surface area of $E$','the mass of $E$, regardless of density','always exactly zero'], answer:0,
+    explain:'Integrating the constant function $1$ over a solid region just adds up "$1\\times$ each infinitesimal volume element" — which is precisely the definition of the region\u2019s volume.' },
+  { topic:'Level curves', type:'mc', stem:'The level curves of $f(x,y)=c$ (for varying constants $c$) are:', options:['curves in the $xy$-plane where $f$ takes the constant value $c$','always straight lines, regardless of $f$','identical to the gradient vector field','only defined exactly at critical points'], answer:0,
+    explain:'A level curve is a slice: fix the output value $c$ and trace every input point that produces it — like the contour lines on a topographic map.' },
+  { topic:'Multivariable chain rule', type:'mc', stem:'For $z=f(x,y)$ with $x=x(t),\\ y=y(t)$, the chain rule gives $\\dfrac{dz}{dt}=$', options:['$f_x\\dfrac{dx}{dt}+f_y\\dfrac{dy}{dt}$','$f_x\\cdot f_y$','$\\dfrac{dx}{dt}\\cdot\\dfrac{dy}{dt}$','$f_x+f_y$, with no chain-rule factors at all'], answer:0,
+    explain:'Each variable\u2019s change contributes its own term: how fast $f$ changes per unit of $x$ times how fast $x$ changes per unit of $t$, plus the same for $y$ — the two contributions add.' }
+];
+add({ id:'practice-quiz-calc3', cat:'calc3', tag:'test yourself', title:'Practice & Check — Test Your Understanding', diff:'inter', ch:'Ch 12–15 review',
+  questions:['Which is shakier right now — the vector/geometry side (Ch 12–13) or the multivariable-calculus side (Ch 14–15)?','When a formula question trips you up, could you re-derive the formula instead of just recalling it?','Could you sketch the geometric picture (a plane, a gradient, a saddle) behind each question?'],
+  blurb:'A short, auto-graded review spanning vectors, partial derivatives, gradients, critical points, and multiple integrals, drawn from a larger pool — press Reset for a fresh set of questions.',
+  build: makeQuizBuild(QUIZ_POOL_CALC3, 12)
+});
+
 /* --------------------- (4) CATALOG RENDERING ------------------------ */
 const DIFF_LABEL={intro:'Intro',inter:'Intermediate',adv:'Advanced'};
 const DIFF_CLASS={intro:'diff-intro',inter:'diff-inter',adv:'diff-adv'};
