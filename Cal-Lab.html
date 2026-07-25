@@ -650,7 +650,7 @@ function makeFnInput(label,initial,vars,onok,hint){
 /* ===== Sym: tiny symbolic engine (parse → tree, eval, diff, simplify, print, compile) ===== */
 const Sym = (function(){
   const U1=['asin','acos','atan','sinh','cosh','tanh','sin','cos','tan','sec','csc','cot','exp','ln','log','log10','sqrt','abs','sign','floor','ceil','round'];
-  function tokenize(s){ const t=[]; let i=0; s=convertAbsBars(s.replace(/\s+/g,''));
+  function tokenize(s){ const t=[]; let i=0; s=convertAbsBars(s.replace(/\s+/g,'')).replace(/\{/g,'(').replace(/\}/g,')');
     while(i<s.length){ const c=s[i];
       if(/[0-9.]/.test(c)){ let j=i+1; while(j<s.length&&/[0-9.]/.test(s[j]))j++; t.push({t:'num',v:parseFloat(s.slice(i,j))}); i=j; }
       else if(/[a-zA-Z]/.test(c)){ let j=i+1; while(j<s.length&&/[a-zA-Z0-9]/.test(s[j]))j++; t.push({t:'id',v:s.slice(i,j)}); i=j; }
@@ -2129,18 +2129,26 @@ function makeQuizBuild(pool, nQuestions=12){
       w.get=()=>sel; w.set=(v)=>{ sel=v; paint(); };
       return w;
     }
-    /* numeric answer: a plain text field (no native up/down spin arrows) —
-       just type the number directly. inputmode="decimal" brings up a
-       numeric keyboard on mobile. */
+    /* numeric answer: a plain text field (no native up/down spin arrows).
+       Accepts not just plain decimals but small math expressions — a
+       fraction like 1/3, sqrt(2), pi/2, e^2, and so on — evaluated with
+       the same expression engine used elsewhere in the app. */
     function numControl(){
       const w=document.createElement('div'); w.className='ctrl';
-      w.innerHTML=`<label>Your answer</label><input type="text" inputmode="decimal" autocomplete="off" placeholder="type a number…">`;
+      w.innerHTML=`<label>Your answer</label><input type="text" inputmode="text" autocomplete="off" placeholder="e.g. 0.5, 1/3, pi/2, sqrt(2), 2^(1/2)">`;
       const inp=w.querySelector('input');
-      inp.addEventListener('input',()=>{ inp.value=inp.value.replace(/[^0-9eE+\-.]/g,''); });
+      inp.addEventListener('input',()=>{ inp.value=inp.value.replace(/[^0-9a-zA-Z+\-*/^(){}. ]/g,''); });
       w.get=()=>inp.value; w.set=(v)=>inp.value=v; w.input=inp;
       return w;
     }
-    host.appendChild(UI.note('Answer every question below, then press <b>Check my answers</b>. Multiple-choice questions grade by your selection; numeric answers allow a small rounding tolerance and can just be typed in. Every question — right or wrong — shows a worked explanation. <b>Reset</b> draws a brand-new set of questions from a larger pool.'));
+    /* evaluate a typed answer: try it as a small math expression first
+       (handles fractions, π, e, √, etc.), falling back to a plain number. */
+    function evalAnswerExpr(raw){
+      const s=(raw||'').trim(); if(!s) return NaN;
+      try{ const v=Sym.compile(s,[])(); if(isFinite(v)) return v; }catch(e){}
+      const v2=parseFloat(s); return isFinite(v2)?v2:NaN;
+    }
+    host.appendChild(UI.note('Answer every question below, then press <b>Check my answers</b>. Multiple-choice questions grade by your selection; numeric answers allow a small rounding tolerance (always at least ±0.0015, so anything correct to 3 decimal places is accepted) and can be typed either as a decimal or as a small expression — <b>1/3</b>, <b>pi/2</b>, <b>sqrt(2)</b>, <b>e^2</b>, <b>2^(1/2)</b>, <b>20^{1/3}</b> all work. Every question — right or wrong — shows a worked explanation. <b>Reset</b> draws a brand-new set of questions from a larger pool.'));
     const wrap=document.createElement('div'); wrap.style.cssText='max-width:760px;margin-top:18px;';
     host.appendChild(wrap);
     const scoreBox=UI.statsBox(); scoreBox.style.cssText='max-width:760px;margin-bottom:14px;';
@@ -2184,8 +2192,10 @@ function makeQuizBuild(pool, nQuestions=12){
           const sel=control.get(); answered=sel>=0; ok = sel===q.answer;
         } else {
           const raw=control.get();
-          answered = raw!=='';
-          const val=parseFloat(raw); ok = answered && isFinite(val) && Math.abs(val-q.answer)<=q.tol;
+          answered = raw.trim()!=='';
+          const val=evalAnswerExpr(raw);
+          const effTol=Math.max(q.tol,0.0015); // always accept a value correct to 3 decimal places
+          ok = answered && isFinite(val) && Math.abs(val-q.answer)<=effTol;
         }
         card.style.borderLeftColor = ok?COL.calc2:COL.coral;
         fb.style.display='block';
