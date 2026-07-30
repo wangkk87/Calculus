@@ -8,6 +8,11 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600;9..144,700&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Cpath d='M4 26 C 9 26, 11 6, 16 6 S 23 26, 28 26' stroke='%232563EB' stroke-width='2.6' fill='none' stroke-linecap='round'/%3E%3Cline x1='4' y1='22' x2='28' y2='10' stroke='%237C3AED' stroke-width='2.2' stroke-linecap='round'/%3E%3C/svg%3E">
+<meta property="og:title" content="CalculusLab — Interactive Calculus Visualizations">
+<meta property="og:description" content="Interactive calculus tools for Calc I, II, and III — limits, derivatives, integrals, series, vectors, and multivariable calculus. Built for the classroom.">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary">
 <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css">
 <script src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
 <style>
@@ -16,7 +21,7 @@
   --paper-2:#EAF1F1;
   --ink:#15233A;
   --ink-soft:#445268;
-  --ink-faint:#82909F;
+  --ink-faint:#6C7A89;
   --line:#D8E3E3;
   --grid:#E4ECEC;
   --white:#FFFFFF;
@@ -586,8 +591,8 @@ const UI = {
     w.innerHTML=`<label>${label}</label><textarea>${value}</textarea>${hint?`<span class="hint">${hint}</span>`:''}`;
     const t=w.querySelector('textarea'); t.addEventListener('input',()=>onchange(t.value)); w.get=()=>t.value; w.set=(v)=>t.value=v; return w; },
   seg({label,options,value,onchange}){ const w=document.createElement('div'); w.className='ctrl';
-    w.innerHTML=`${label?`<label>${label}</label>`:''}<div class="seg"></div>`; const seg=w.querySelector('.seg');
-    options.forEach(o=>{ const b=document.createElement('button'); b.textContent=o.label; b.className=o.value===value?'on':''; b.onclick=()=>{ seg.querySelectorAll('button').forEach(x=>x.classList.remove('on')); b.classList.add('on'); w._v=o.value; onchange(o.value); }; seg.appendChild(b); }); w._v=value; w.get=()=>w._v; w.set=(v)=>{ w._v=v; [...seg.children].forEach((b,idx)=>b.classList.toggle('on',options[idx].value===v)); }; return w; },
+    w.innerHTML=`${label?`<label>${label}</label>`:''}<div class="seg" role="radiogroup" aria-label="${label||''}"></div>`; const seg=w.querySelector('.seg');
+    options.forEach(o=>{ const b=document.createElement('button'); b.type='button'; b.setAttribute('role','radio'); b.setAttribute('aria-checked',o.value===value?'true':'false'); b.textContent=o.label; b.className=o.value===value?'on':''; b.onclick=()=>{ seg.querySelectorAll('button').forEach(x=>{x.classList.remove('on');x.setAttribute('aria-checked','false');}); b.classList.add('on'); b.setAttribute('aria-checked','true'); w._v=o.value; onchange(o.value); }; seg.appendChild(b); }); w._v=value; w.get=()=>w._v; w.set=(v)=>{ w._v=v; [...seg.children].forEach((b,idx)=>{const on=options[idx].value===v; b.classList.toggle('on',on); b.setAttribute('aria-checked',on?'true':'false');}); }; return w; },
   select({label,options,value,onchange}){ const w=document.createElement('div'); w.className='ctrl';
     w.innerHTML=`<label>${label}</label><select>${options.map(o=>`<option value="${o.value}" ${o.value===value?'selected':''}>${o.label}</option>`).join('')}</select>`;
     const s=w.querySelector('select'); s.addEventListener('change',()=>onchange(s.value)); w.get=()=>s.value; w.set=(v)=>s.value=v; return w; },
@@ -600,10 +605,10 @@ const UI = {
     return w; },
   statsBox(){ const w=document.createElement('div'); w.className='stats'; w.set=(arr)=>{ w.innerHTML=arr.map(s=>`<div class="stat"><div class="k">${s.k}</div><div class="v ${s.accent?'accent':''}">${s.v}</div></div>`).join(''); }; return w; },
   plotCard(title,h=null){ const w=document.createElement('div'); w.className='plot-card';
-    w.innerHTML=`<div class="plot-title">${title}</div><div class="plotwrap"><canvas></canvas></div>`;
+    w.innerHTML=`<div class="plot-title">${title}</div><div class="plotwrap"><canvas role="img" aria-label="${title}"></canvas></div>`;
     const cv=w.querySelector('canvas'); w.canvas=cv;
     w.chart=(opts)=>new Chart(cv,Object.assign(h?{cssH:h}:{}, cv._zoomOn?{zoom:cv._zoom}:{}, opts||{}));
-    w.setTitle=(t)=>w.querySelector('.plot-title').textContent=t;
+    w.setTitle=(t)=>{ w.querySelector('.plot-title').textContent=t; cv.setAttribute('aria-label',t); };
     w.enableZoom=function(redraw){
       cv._zoom={k:1,ox:0,oy:0}; cv._zoomOn=true;
       const wrap=w.querySelector('.plotwrap'); wrap.style.position='relative'; cv.style.cursor='grab'; cv.style.touchAction='none';
@@ -3638,7 +3643,7 @@ function filterCatalog(q){
 /* ------------------------- (5) ROUTER ------------------------------- */
 const homeEl=document.getElementById('home'), viewEl=document.getElementById('appletView');
 function goHome(){ location.hash=''; showHome(); }
-function showHome(){ viewEl.style.display='none'; homeEl.style.display='block'; }
+function showHome(){ viewEl.style.display='none'; homeEl.style.display='block'; document.title='CalculusLab — Interactive Calculus Visualizations'; const metaDesc=document.querySelector('meta[name="description"]'); if(metaDesc)metaDesc.setAttribute('content','Interactive calculus tools for Calc I, II, and III — limits, derivatives, integrals, series, vectors, and multivariable calculus. Built for the classroom.'); }
 function goApplet(id){ location.hash='/'+id; }
 
 let _dark=false;
@@ -3681,6 +3686,8 @@ document.addEventListener('keydown',e=>{
 function openApplet(id){
   const ap=APPLETS.find(a=>a.id===id); if(!ap){ showHome(); return; }
   const cat=CATS[ap.cat];
+  document.title=ap.title+' — CalculusLab';
+  const metaDesc=document.querySelector('meta[name="description"]'); if(metaDesc)metaDesc.setAttribute('content',ap.blurb);
   homeEl.style.display='none'; viewEl.style.display='block'; viewEl.style.setProperty('--accent',cat.color);
   viewEl.innerHTML='';
   const w=document.createElement('div'); w.className='wrap';
@@ -3725,7 +3732,7 @@ function heroAnim(){
     document.getElementById('heroSlope').textContent=M.round(sec,3);
     document.getElementById('heroDeriv').textContent=M.round(deriv,3);
     h*=0.94; if(h<0.05)h=2.6;
-    if(!reduce) heroRAF=requestAnimationFrame(()=>setTimeout(frame,60));
+    if(!reduce) window.heroRAF=requestAnimationFrame(()=>setTimeout(frame,60));
   }
   if(window.heroRAF)cancelAnimationFrame(window.heroRAF);
   if(reduce){ h=0.05; frame(); } else frame();
@@ -3737,7 +3744,13 @@ try{ if(localStorage.getItem('cl-dark')==='1'){ _dark=true; } }catch(e){}
 applyDark(_dark);
 heroAnim();
 route();
-let _rz; window.addEventListener('resize',()=>{ clearTimeout(_rz); _rz=setTimeout(()=>{ if(viewEl.style.display==='block'){ const id=location.hash.slice(2); if(id)openApplet(decodeURIComponent(id)); } else heroAnim(); },180); });
+let _rz; let _wasMobile=window.innerWidth<=880;
+window.addEventListener('resize',()=>{ clearTimeout(_rz); _rz=setTimeout(()=>{
+  const isMobile=window.innerWidth<=880;
+  if(viewEl.style.display==='block'){
+    if(isMobile!==_wasMobile){ _wasMobile=isMobile; const id=location.hash.slice(2); if(id)openApplet(decodeURIComponent(id)); }
+  } else { _wasMobile=isMobile; heroAnim(); }
+},180); });
 
 const searchWrap=document.querySelector('.search-wrap');
 if(searchWrap){
