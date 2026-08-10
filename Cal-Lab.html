@@ -142,6 +142,18 @@ canvas{display:block;}
 .ctrl input[type=number],.ctrl input[type=text],.ctrl select,.ctrl textarea{font-family:var(--mono);font-size:.88rem;padding:9px 11px;border:1px solid var(--line);border-radius:var(--r-sm);background:var(--paper);color:var(--ink);width:100%;}
 .ctrl textarea{min-height:90px;resize:vertical;line-height:1.5;}
 .ctrl .hint{font-size:.74rem;color:var(--ink-faint);}
+
+/* ---------- Graphing calculator: equation list ---------- */
+.eq-list{display:flex;flex-direction:column;gap:8px;}
+.eq-row{display:flex;align-items:center;gap:8px;}
+.eq-row .eq-swatch{flex:none;width:11px;height:11px;border-radius:99px;box-shadow:0 0 0 3px color-mix(in srgb, var(--sw,#888) 18%, transparent);}
+.eq-row input[type=text]{flex:1;font-family:var(--mono);font-size:.88rem;padding:9px 11px;border:1px solid var(--line);border-radius:var(--r-sm);background:var(--paper);color:var(--ink);min-width:0;}
+.eq-row input[type=text]:focus{outline:none;border-color:var(--sw,var(--c-calc1));}
+.eq-row.eq-error input[type=text]{border-color:var(--rose,#E11D48);}
+.eq-row .eq-remove{flex:none;width:26px;height:26px;border:1px solid var(--line);background:var(--paper);border-radius:7px;color:var(--ink-faint);font-size:.9rem;line-height:1;cursor:pointer;transition:.15s;}
+.eq-row .eq-remove:hover{color:var(--coral,#F43F5E);border-color:var(--coral,#F43F5E);}
+.eq-add{align-self:flex-start;}
+.bounds-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px 12px;}
 .seg{display:flex;border:1px solid var(--line);border-radius:99px;overflow:hidden;background:var(--paper);}
 .seg button{flex:1;border:none;background:transparent;padding:8px;font-size:.8rem;font-weight:600;color:var(--ink-soft);transition:.15s;}
 .seg button.on{background:var(--accent,var(--c-calc1));color:#fff;}
@@ -204,6 +216,20 @@ canvas{display:block;}
 .share-btn:hover{color:var(--ink);border-color:var(--ink-soft);}
 .share-btn.copied{color:var(--c-calc2);border-color:var(--c-calc2);}
 
+/* ---------- Visit counter ---------- */
+.visit-badge{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:.72rem;font-weight:600;background:var(--paper-2);border:1px solid var(--line);border-radius:99px;padding:6px 13px;color:var(--ink-soft);white-space:nowrap;}
+.visit-badge svg{flex:none;opacity:.8;}
+.visit-badge b{color:var(--ink);font-weight:700;}
+@media(max-width:640px){.visit-badge .vlabel{display:none;}}
+
+/* ---------- Chart PNG download ---------- */
+.plot-card{position:relative;}
+.plot-card .plot-title{padding-right:26px;}
+.plot-dl-btn{position:absolute;top:10px;right:10px;width:24px;height:24px;display:flex;align-items:center;justify-content:center;background:var(--white);border:1px solid var(--line);border-radius:7px;color:var(--ink-faint);cursor:pointer;transition:.15s;padding:0;z-index:5;}
+.plot-dl-btn:hover{color:var(--ink);border-color:var(--ink-soft);background:var(--paper-2);}
+.plot-dl-btn:active{transform:scale(.92);}
+.plot-dl-btn svg{width:13px;height:13px;pointer-events:none;}
+
 .formula{font-family:var(--mono);font-size:.86rem;background:var(--paper-2);border:1px solid var(--line);border-radius:var(--r-sm);padding:8px 12px;color:var(--ink);overflow-x:auto;}
 
 @media(max-width:880px){
@@ -246,6 +272,10 @@ canvas{display:block;}
       CalculusLab <span class="beta">v1</span>
     </button>
     <nav id="topnav"></nav>
+    <span class="visit-badge" id="visitBadge" title="Times you've visited this page">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>
+      <b id="visitCount">0</b><span class="vlabel">&nbsp;visits</span>
+    </span>
     <button class="share-btn" id="darkToggle" onclick="toggleDark()" title="Toggle dark mode" aria-label="Toggle dark mode">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" id="darkIcon"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
     </button>
@@ -268,6 +298,9 @@ canvas{display:block;}
         <div class="cap">
           <span class="ttl">Secant slope → tangent slope</span>
           <span class="live"><span class="dot"></span>h → 0</span>
+          <button type="button" id="heroDlBtn" class="plot-dl-btn" style="position:static;margin-left:10px;" title="Download as PNG" aria-label="Download chart as PNG">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M5 21h14"/></svg>
+          </button>
         </div>
         <canvas id="heroCanvas" width="560" height="300" aria-label="An animation of a secant line converging to a tangent line as h approaches zero"></canvas>
         <div class="hero-readout">
@@ -519,6 +552,74 @@ class Chart{
     ctx.strokeStyle=color; ctx.fillStyle=color; ctx.lineWidth=w; ctx.beginPath(); ctx.moveTo(X0,Y0); ctx.lineTo(X1,Y1); ctx.stroke();
     const ang=Math.atan2(Y1-Y0,X1-X0), s=7; ctx.beginPath(); ctx.moveTo(X1,Y1); ctx.lineTo(X1-s*Math.cos(ang-0.4),Y1-s*Math.sin(ang-0.4)); ctx.lineTo(X1-s*Math.cos(ang+0.4),Y1-s*Math.sin(ang+0.4)); ctx.closePath(); ctx.fill(); }
 }
+/* download any canvas as a PNG (flattens onto an opaque background first,
+   since chart canvases are cleared to transparent between redraws) */
+function downloadCanvasPNG(canvas,filename){
+  try{
+    const out=document.createElement('canvas');
+    out.width=canvas.width; out.height=canvas.height;
+    const octx=out.getContext('2d');
+    octx.fillStyle=COL.paper||'#FFFFFF';
+    octx.fillRect(0,0,out.width,out.height);
+    octx.drawImage(canvas,0,0);
+    const url=out.toDataURL('image/png');
+    const a=document.createElement('a');
+    a.href=url; a.download=(filename||'chart')+'.png';
+    document.body.appendChild(a); a.click(); a.remove();
+  }catch(e){ console.error('PNG export failed',e); }
+}
+/* small download-PNG button, absolutely positioned inside a .plot-card / .hero-canvas-card */
+function makeDownloadBtn(getCanvas,getName){
+  const b=document.createElement('button');
+  b.type='button'; b.className='plot-dl-btn'; b.title='Download as PNG'; b.setAttribute('aria-label','Download chart as PNG');
+  b.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="M7 10l5 5 5-5"/><path d="M5 21h14"/></svg>';
+  b.addEventListener('click',(e)=>{ e.stopPropagation(); e.preventDefault(); const cv=getCanvas(); if(cv) downloadCanvasPNG(cv, typeof getName==='function'?getName():getName); });
+  return b;
+}
+/* general-purpose implicit-equation parser: "expr" -> y=expr, or "lhs=rhs" -> G(x,y)=lhs-rhs.
+   Works for both explicit functions (y=sin(x)) and implicit curves (x^2+y^2=9). */
+function parseImplicitEq(text){
+  let s=(text||'').trim();
+  if(!s) throw new Error('empty');
+  if(!s.includes('=')) s='y=('+s+')';
+  const parts=s.split('=');
+  if(parts.length!==2) throw new Error('use exactly one "="');
+  const lhs=compileExpr(parts[0],['x','y']);
+  const rhs=compileExpr(parts[1],['x','y']);
+  const G=(x,y)=>lhs(x,y)-rhs(x,y);
+  const t=G(0.31,0.47);
+  if(typeof t!=='number') throw new Error('could not evaluate');
+  return G;
+}
+/* trace the zero-set of G(x,y) over a grid via marching squares -> array of [ptA,ptB] segments */
+function marchingSquaresSegments(G,xmin,xmax,ymin,ymax,nx,ny){
+  const dx=(xmax-xmin)/nx, dy=(ymax-ymin)/ny;
+  const val=new Float64Array((nx+1)*(ny+1));
+  for(let j=0;j<=ny;j++){ const y=ymin+j*dy; for(let i=0;i<=nx;i++){ const x=xmin+i*dx; val[j*(nx+1)+i]=G(x,y); } }
+  const v=(i,j)=>val[j*(nx+1)+i];
+  const segs=[];
+  function lerpEdge(va,vb,pa,pb){ const t=va/(va-vb); return [pa[0]+t*(pb[0]-pa[0]), pa[1]+t*(pb[1]-pa[1])]; }
+  for(let j=0;j<ny;j++)for(let i=0;i<nx;i++){
+    const x0=xmin+i*dx, x1=x0+dx, y0=ymin+j*dy, y1=y0+dy;
+    const v00=v(i,j), v10=v(i+1,j), v11=v(i+1,j+1), v01=v(i,j+1);
+    if(![v00,v10,v11,v01].every(isFinite)) continue;
+    const s00=v00>=0,s10=v10>=0,s11=v11>=0,s01=v01>=0;
+    const c=(s00?1:0)|(s10?2:0)|(s11?4:0)|(s01?8:0);
+    if(c===0||c===15) continue;
+    const B=()=>lerpEdge(v00,v10,[x0,y0],[x1,y0]), R=()=>lerpEdge(v10,v11,[x1,y0],[x1,y1]);
+    const T=()=>lerpEdge(v01,v11,[x0,y1],[x1,y1]), L=()=>lerpEdge(v00,v01,[x0,y0],[x0,y1]);
+    const push=(p1,p2)=>segs.push([p1,p2]);
+    switch(c){
+      case 1: push(L(),B()); break; case 2: push(B(),R()); break; case 3: push(L(),R()); break;
+      case 4: push(R(),T()); break; case 6: push(B(),T()); break; case 7: push(L(),T()); break;
+      case 8: push(L(),T()); break; case 9: push(B(),T()); break; case 11: push(R(),T()); break;
+      case 12: push(L(),R()); break; case 13: push(B(),R()); break; case 14: push(L(),B()); break;
+      case 5: { const cc=(v00+v10+v11+v01)/4; if((cc>=0)===(v00>=0)){ push(L(),B()); push(R(),T()); } else { push(L(),T()); push(B(),R()); } break; }
+      case 10:{ const cc=(v00+v10+v11+v01)/4; if((cc>=0)===(v10>=0)){ push(B(),R()); push(L(),T()); } else { push(L(),B()); push(R(),T()); } break; }
+    }
+  }
+  return segs;
+}
 function niceTicks(min,max,n=6){ const span=max-min||1; const step0=span/n; const mag=Math.pow(10,Math.floor(Math.log10(step0)));
   const norm=step0/mag; let step; if(norm<1.5)step=1; else if(norm<3)step=2; else if(norm<7)step=5; else step=10; step*=mag;
   const t=[]; let v=Math.ceil(min/step)*step; while(v<=max+1e-9){ t.push(M.round(v,6)); v+=step; } return t; }
@@ -604,11 +705,14 @@ const UI = {
     if(primaryBtn){ w._primaryBtn=primaryBtn; }
     return w; },
   statsBox(){ const w=document.createElement('div'); w.className='stats'; w.set=(arr)=>{ w.innerHTML=arr.map(s=>`<div class="stat"><div class="k">${s.k}</div><div class="v ${s.accent?'accent':''}">${s.v}</div></div>`).join(''); }; return w; },
-  plotCard(title,h=null){ const w=document.createElement('div'); w.className='plot-card';
+  plotCard(title,h=null,filename=null){ const w=document.createElement('div'); w.className='plot-card';
     w.innerHTML=`<div class="plot-title">${title}</div><div class="plotwrap"><canvas role="img" aria-label="${title}"></canvas></div>`;
     const cv=w.querySelector('canvas'); w.canvas=cv;
+    w._title=title; w._filename=filename;
+    const dlBtn=makeDownloadBtn(()=>cv,()=>('calculuslab-'+(w._filename||w._title||'chart')).toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/(^-|-$)/g,''));
+    w.appendChild(dlBtn);
     w.chart=(opts)=>new Chart(cv,Object.assign(h?{cssH:h}:{}, cv._zoomOn?{zoom:cv._zoom}:{}, opts||{}));
-    w.setTitle=(t)=>{ w.querySelector('.plot-title').textContent=t; cv.setAttribute('aria-label',t); };
+    w.setTitle=(t)=>{ w._title=t; w.querySelector('.plot-title').textContent=t; cv.setAttribute('aria-label',t); };
     w.enableZoom=function(redraw){
       cv._zoom={k:1,ox:0,oy:0}; cv._zoomOn=true;
       const wrap=w.querySelector('.plotwrap'); wrap.style.position='relative'; cv.style.cursor='grab'; cv.style.touchAction='none';
@@ -1372,6 +1476,89 @@ function ratAnalyze(tree, f, lo, hi){
    ===================================================================== */
 
 /* ----- 1. Function Transformer (Ch 1.3) ----- */
+/* ----- 0. Graphing Calculator (Ch 1.1) ----- */
+add({ id:'graphing-calculator', cat:'calc1', tag:'interactive', title:'Graphing Calculator', diff:'intro', ch:'Ch 1.1',
+  questions:['What happens to the curve near a point where the function is undefined?','How do the x- and y-bounds change how "steep" or "flat" a curve looks?','Try an implicit equation like x^2+y^2=9 — how is it different from a function y=f(x)?'],
+  blurb:'A Desmos-style grapher — type any equation (explicit y=f(x) or implicit, like x^2+y^2=9), set the view window, and pan/zoom freely.',
+  build(host){
+    const PALETTE=[COL.calc1,COL.coral,COL.calc2,COL.amber,COL.calc3,COL.cyan,COL.rose,COL.green];
+    let colorIdx=0, eqNum=1;
+    const eqs=[]; // {num,color,input,rowEl}
+    const listEl=document.createElement('div'); listEl.className='eq-list';
+
+    function updateRemoveVisibility(){
+      eqs.forEach(eq=>{ eq.rowEl.querySelector('.eq-remove').style.visibility = eqs.length>1?'visible':'hidden'; });
+    }
+    function newRow(initial){
+      const num=eqNum++;
+      const color=PALETTE[colorIdx++%PALETTE.length];
+      const row=document.createElement('div'); row.className='eq-row'; row.style.setProperty('--sw',color);
+      row.innerHTML=`<span class="eq-swatch" style="background:${color}"></span>
+        <span style="font-family:var(--mono);font-size:.78rem;color:var(--ink-faint);flex:none;">y${num}=</span>
+        <input type="text" value="" placeholder="e.g. sin(x), x^2-3, x^2+y^2=9" spellcheck="false" autocomplete="off">
+        <button type="button" class="eq-remove" title="Remove equation" aria-label="Remove equation">×</button>`;
+      const inp=row.querySelector('input'), rm=row.querySelector('.eq-remove');
+      inp.value=initial||'';
+      const eq={num,color,input:inp,rowEl:row};
+      inp.addEventListener('input',render);
+      rm.addEventListener('click',()=>{ const idx=eqs.indexOf(eq); if(idx>=0)eqs.splice(idx,1); row.remove(); updateRemoveVisibility(); render(); });
+      eqs.push(eq); listEl.appendChild(row); updateRemoveVisibility();
+      return eq;
+    }
+    newRow('sin(x)');
+
+    const addBtn=document.createElement('button'); addBtn.type='button'; addBtn.className='abtn eq-add'; addBtn.textContent='+ Add equation';
+    addBtn.addEventListener('click',()=>{ newRow(''); render(); listEl.lastElementChild.querySelector('input').focus(); });
+
+    const eqWrap=document.createElement('div'); eqWrap.className='ctrl';
+    eqWrap.innerHTML='<label>Equations</label>';
+    eqWrap.appendChild(listEl); eqWrap.appendChild(addBtn);
+
+    const xMinC=UI.number({label:'x min',value:-10,step:'any',onchange:applyBounds});
+    const xMaxC=UI.number({label:'x max',value:10,step:'any',onchange:applyBounds});
+    const yMinC=UI.number({label:'y min',value:-10,step:'any',onchange:applyBounds});
+    const yMaxC=UI.number({label:'y max',value:10,step:'any',onchange:applyBounds});
+    const boundsWrap=document.createElement('div'); boundsWrap.className='ctrl';
+    boundsWrap.innerHTML='<label>View window</label>';
+    const bg=document.createElement('div'); bg.className='bounds-grid'; bg.append(xMinC,xMaxC,yMinC,yMaxC);
+    boundsWrap.appendChild(bg);
+
+    const resetBtn=UI.buttons([{label:'Reset view',onclick:()=>{ xMinC.set(-10);xMaxC.set(10);yMinC.set(-10);yMaxC.set(10); applyBounds(); }}]);
+
+    const plot=UI.plotCard('Graph — scroll/pinch or drag to explore',560,'graphing-calculator');
+    host.appendChild(UI.appGrid([eqWrap,boundsWrap,resetBtn,
+      UI.note('Bare expressions like <b>x^2-3</b> are graphed as <b>y =</b> that expression. Use <b>=</b> for implicit curves, e.g. <b>x^2+y^2=9</b> or <b>x^3+y^3=6xy</b>. Supported: + − × / ^, parentheses, <b>sin cos tan</b>, <b>asin acos atan</b>, <b>sinh cosh tanh</b>, <b>exp ln log sqrt abs</b>, and constants <b>pi</b>, <b>e</b>.')
+    ],[plot]));
+
+    plot.enableZoom(render);
+    function applyBounds(){ const cv=plot.canvas; if(cv._zoom) cv._zoom={k:1,ox:0,oy:0}; render(); }
+
+    function render(){
+      let xMin=xMinC.get(), xMax=xMaxC.get(), yMin=yMinC.get(), yMax=yMaxC.get();
+      if(!(isFinite(xMin)&&isFinite(xMax)&&xMax>xMin)) xMax=xMin+1;
+      if(!(isFinite(yMin)&&isFinite(yMax)&&yMax>yMin)) yMax=yMin+1;
+      const ch=plot.chart(); ch.setX(xMin,xMax).setY(yMin,yMax); ch.clear();
+      ch.gridlines(niceTicks(ch.xmin,ch.xmax,8),niceTicks(ch.ymin,ch.ymax,8));
+      ch.axes(); ch.axisX(niceTicks(ch.xmin,ch.xmax,8)); ch.axisY(niceTicks(ch.ymin,ch.ymax,8));
+      ch.clip();
+      eqs.forEach(eq=>{
+        const src=eq.input.value;
+        if(!src||!src.trim()){ eq.rowEl.classList.remove('eq-error'); return; }
+        try{
+          const G=parseImplicitEq(src);
+          const segs=marchingSquaresSegments(G,ch.xmin,ch.xmax,ch.ymin,ch.ymax,260,190);
+          const ctx=ch.ctx; ctx.strokeStyle=eq.color; ctx.lineWidth=2.6; ctx.lineJoin='round'; ctx.beginPath();
+          segs.forEach(s=>{ ctx.moveTo(ch.X(s[0][0]),ch.Y(s[0][1])); ctx.lineTo(ch.X(s[1][0]),ch.Y(s[1][1])); });
+          ctx.stroke();
+          eq.rowEl.classList.remove('eq-error');
+        }catch(e){ eq.rowEl.classList.add('eq-error'); }
+      });
+      ch.unclip();
+    }
+    render();
+  }
+});
+
 add({ id:'function-transforms', cat:'calc1', tag:'explore', title:'Function Transformer', diff:'intro', ch:'Ch 1.3',
   questions:['Does multiplying by a stretch the graph vertically or horizontally?','How is a horizontal shift c different in sign from what you might expect?','Which transformations change where the function crosses the x-axis?'],
   blurb:'See how a·f(b(x−c))+d shifts, stretches, and reflects a base function in real time.',
@@ -3669,6 +3856,19 @@ function applyDark(d){
 }
 function toggleDark(){ _dark=!_dark; try{localStorage.setItem('cl-dark',_dark?'1':'0');}catch(e){} applyDark(_dark); }
 
+/* -------------------- VISIT COUNTER ---------------------------- */
+function recordVisit(){
+  let n=1;
+  try{
+    n=parseInt(localStorage.getItem('cl-visits')||'0',10)||0;
+    n+=1;
+    localStorage.setItem('cl-visits',String(n));
+  }catch(e){}
+  const el=document.getElementById('visitCount');
+  if(el) el.textContent=n;
+  return n;
+}
+
 function shareApplet(){
   const btn=document.getElementById('shareBtn');
   navigator.clipboard.writeText(location.href).then(()=>{
@@ -3742,8 +3942,12 @@ function heroAnim(){
 renderCatalog();
 try{ if(localStorage.getItem('cl-dark')==='1'){ _dark=true; } }catch(e){}
 applyDark(_dark);
+recordVisit();
 heroAnim();
 route();
+document.getElementById('heroDlBtn')?.addEventListener('click',()=>{
+  const cv=document.getElementById('heroCanvas'); if(cv) downloadCanvasPNG(cv,'calculuslab-secant-tangent');
+});
 let _rz; let _wasMobile=window.innerWidth<=880;
 window.addEventListener('resize',()=>{ clearTimeout(_rz); _rz=setTimeout(()=>{
   const isMobile=window.innerWidth<=880;
