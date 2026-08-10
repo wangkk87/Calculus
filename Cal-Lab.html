@@ -149,7 +149,10 @@ canvas{display:block;}
 .eq-row .eq-swatch{flex:none;width:11px;height:11px;border-radius:99px;box-shadow:0 0 0 3px color-mix(in srgb, var(--sw,#888) 18%, transparent);}
 .eq-row input[type=text]{flex:1;font-family:var(--mono);font-size:.88rem;padding:9px 11px;border:1px solid var(--line);border-radius:var(--r-sm);background:var(--paper);color:var(--ink);min-width:0;}
 .eq-row input[type=text]:focus{outline:none;border-color:var(--sw,var(--c-calc1));}
-.eq-row.eq-error input[type=text]{border-color:var(--rose,#E11D48);}
+.eq-row.eq-error input[type=text]{border-color:#E11D48;border-style:dashed;background:color-mix(in srgb, #E11D48 6%, var(--paper));}
+.eq-row.eq-error input[type=text]:focus{border-color:#E11D48;}
+.eq-row .eq-warn{display:none;flex:none;width:18px;height:18px;color:#E11D48;}
+.eq-row.eq-error .eq-warn{display:block;}
 .eq-row .eq-remove{flex:none;width:26px;height:26px;border:1px solid var(--line);background:var(--paper);border-radius:7px;color:var(--ink-faint);font-size:.9rem;line-height:1;cursor:pointer;transition:.15s;}
 .eq-row .eq-remove:hover{color:var(--coral,#F43F5E);border-color:var(--coral,#F43F5E);}
 .eq-add{align-self:flex-start;}
@@ -395,10 +398,32 @@ function convertAbsBars(s){
   for(const ch of s){ if(ch==='|'){ out+= open?')':'abs('; open=!open; } else out+=ch; }
   return out;
 }
+/* Accept a bit of LaTeX-ish input so people can paste/type naturally:
+   - strips stray backslashes ( \sqrt, \pi -> sqrt, pi )
+   - treats { } as grouping parentheses, same as ( )
+   - expands bracket-root shorthand sqrt[n](expr) / sqrt[n]{expr} -> (expr)^(1/(n))
+     so things like sqrt[3](5) (cube root of 5) work */
+function preprocessMath(s){
+  if(s==null) return s;
+  s=String(s).replace(/\\/g,'').replace(/\{/g,'(').replace(/\}/g,')');
+  const re=/sqrt\s*\[\s*([^\]]+?)\s*\]\s*\(/gi;
+  let m, guard=0;
+  while((m=re.exec(s))&&guard++<50){
+    const n=m[1], openIdx=m.index+m[0].length-1;
+    let depth=0, i=openIdx;
+    for(;i<s.length;i++){ if(s[i]==='(')depth++; else if(s[i]===')'){ depth--; if(depth===0)break; } }
+    if(i>=s.length) break;
+    const inner=s.slice(openIdx+1,i);
+    s = s.slice(0,m.index) + '((' + inner + ')^(1/(' + n + ')))' + s.slice(i+1);
+    re.lastIndex=0;
+  }
+  return s;
+}
 function compileExpr(src, vars){
+  const s=preprocessMath(src);
   // Prefer the Sym parser (correct unary/^ precedence; handles -x^2, exp(-x^2)).
-  try{ if(typeof Sym!=='undefined'){ const f=Sym.compile(src,vars); f(...vars.map(()=>0.137)); return f; } }catch(e){ /* fall back to legacy tokenizer below */ }
-  return compileExprLegacy(src, vars);
+  try{ if(typeof Sym!=='undefined'){ const f=Sym.compile(s,vars); f(...vars.map(()=>0.137)); return f; } }catch(e){ /* fall back to legacy tokenizer below */ }
+  return compileExprLegacy(s, vars);
 }
 function compileExprLegacy(src, vars){
   const fns = {
@@ -576,20 +601,64 @@ function makeDownloadBtn(getCanvas,getName){
   b.addEventListener('click',(e)=>{ e.stopPropagation(); e.preventDefault(); const cv=getCanvas(); if(cv) downloadCanvasPNG(cv, typeof getName==='function'?getName():getName); });
   return b;
 }
-/* general-purpose implicit-equation parser: "expr" -> y=expr, or "lhs=rhs" -> G(x,y)=lhs-rhs.
-   Works for both explicit functions (y=sin(x)) and implicit curves (x^2+y^2=9). */
-function parseImplicitEq(text){
+/* general-purpose equation classifier: "expr" -> y=expr, or "lhs=rhs".
+   Returns {type:'explicit', fn} for plain y=f(x) forms (drawn with fast 1-D
+   sampling that cleanly breaks at asymptotes), or {type:'implicit', G} for
+   anything genuinely 2-D like x^2+y^2=9 (drawn via marching squares). */
+function classifyEquation(text){
   let s=(text||'').trim();
   if(!s) throw new Error('empty');
   if(!s.includes('=')) s='y=('+s+')';
   const parts=s.split('=');
   if(parts.length!==2) throw new Error('use exactly one "="');
+  const lhsIsY = parts[0].replace(/\s+/g,'').toLowerCase()==='y';
+  const rhsHasY = /\by\b/i.test(parts[1]);
+  if(lhsIsY && !rhsHasY){
+    const fn=compileExpr(parts[1],['x']);
+    const t=fn(0.137); if(typeof t!=='number') throw new Error('could not evaluate');
+    return {type:'explicit', fn};
+  }
   const lhs=compileExpr(parts[0],['x','y']);
   const rhs=compileExpr(parts[1],['x','y']);
   const G=(x,y)=>lhs(x,y)-rhs(x,y);
   const t=G(0.31,0.47);
   if(typeof t!=='number') throw new Error('could not evaluate');
-  return G;
+  return {type:'implicit', G};
+}
+/* scan y=f(x) for vertical asymptotes (poles) within [xmin,xmax], refine each
+   via bisection on the sign flip, and detect horizontal asymptotes by sampling
+   f at increasingly large |x|. Capped so periodic functions (tan, etc.) don't
+   flood the view. */
+function detectAsymptotes(fn,xmin,xmax){
+  const N=700, dx=(xmax-xmin)/N;
+  let prevX=xmin, prevY=fn(prevX);
+  const vert=[];
+  for(let i=1;i<=N;i++){
+    const x=xmin+i*dx, y=fn(x);
+    const bothFinite=isFinite(prevY)&&isFinite(y);
+    const bigJump=bothFinite && Math.sign(prevY)!==Math.sign(y) && (Math.abs(prevY)>60||Math.abs(y)>60);
+    const wentInfinite=isFinite(prevY)&&!isFinite(y);
+    if(bigJump||wentInfinite){
+      let a=prevX,b=x,fa=prevY;
+      for(let k=0;k<50;k++){
+        const m=(a+b)/2, fm=fn(m);
+        if(isFinite(fm)&&Math.sign(fm)===Math.sign(fa)){ a=m; fa=fm; } else { b=m; }
+      }
+      vert.push((a+b)/2);
+    }
+    prevX=x; prevY=y;
+    if(vert.length>=16) break;
+  }
+  const horiz=[];
+  [1,-1].forEach(sign=>{
+    const xs=[1e4,1e5,1e6,1e7].map(v=>sign*v);
+    let ys;
+    try{ ys=xs.map(x=>fn(x)); }catch(e){ return; }
+    if(!ys.every(v=>typeof v==='number'&&isFinite(v))) return;
+    const dLast=Math.abs(ys[3]-ys[2]), scale=Math.max(1,Math.abs(ys[3]));
+    if(dLast<scale*1e-5) horiz.push(M.round(ys[3],4));
+  });
+  return { vert, horiz:[...new Set(horiz)] };
 }
 /* trace the zero-set of G(x,y) over a grid via marching squares -> array of [ptA,ptB] segments */
 function marchingSquaresSegments(G,xmin,xmax,ymin,ymax,nx,ny){
@@ -1496,6 +1565,7 @@ add({ id:'graphing-calculator', cat:'calc1', tag:'interactive', title:'Graphing 
       row.innerHTML=`<span class="eq-swatch" style="background:${color}"></span>
         <span style="font-family:var(--mono);font-size:.78rem;color:var(--ink-faint);flex:none;">y${num}=</span>
         <input type="text" value="" placeholder="e.g. sin(x), x^2-3, x^2+y^2=9" spellcheck="false" autocomplete="off">
+        <svg class="eq-warn" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" title="Couldn't parse this equation"><path d="M12 9v4"/><path d="M12 17h.01"/><path d="M10.29 3.86 1.82 18a1.5 1.5 0 0 0 1.3 2.25h17.76a1.5 1.5 0 0 0 1.3-2.25L13.71 3.86a1.5 1.5 0 0 0-2.42 0Z"/></svg>
         <button type="button" class="eq-remove" title="Remove equation" aria-label="Remove equation">×</button>`;
       const inp=row.querySelector('input'), rm=row.querySelector('.eq-remove');
       inp.value=initial||'';
@@ -1514,20 +1584,44 @@ add({ id:'graphing-calculator', cat:'calc1', tag:'interactive', title:'Graphing 
     eqWrap.innerHTML='<label>Equations</label>';
     eqWrap.appendChild(listEl); eqWrap.appendChild(addBtn);
 
-    const xMinC=UI.number({label:'x min',value:-10,step:'any',onchange:applyBounds});
-    const xMaxC=UI.number({label:'x max',value:10,step:'any',onchange:applyBounds});
-    const yMinC=UI.number({label:'y min',value:-10,step:'any',onchange:applyBounds});
-    const yMaxC=UI.number({label:'y max',value:10,step:'any',onchange:applyBounds});
+    /* bounds accept full expressions (pi, e, sqrt(2), sqrt[3](5), 2*pi, ...) not just plain numbers.
+       Fields start EMPTY (auto view); typing a value restricts that side of the window. */
+    function evalConst(text){
+      const f=compileExpr(text,[]); const v=f();
+      if(typeof v!=='number'||!isFinite(v)) throw new Error('not a number');
+      return v;
+    }
+    function makeBoundInput(label,autoDefault){
+      const w=document.createElement('div'); w.className='ctrl';
+      w.innerHTML=`<label>${label}</label><input type="text" value="" placeholder="${autoDefault} (auto)" inputmode="decimal" spellcheck="false" autocomplete="off">`;
+      const inp=w.querySelector('input'); let cached=null; // null = auto
+      inp.addEventListener('input',()=>{
+        const raw=inp.value.trim();
+        if(!raw){ cached=null; inp.style.borderColor=''; applyBounds(); return; }
+        try{ cached=evalConst(raw); inp.style.borderColor=''; }catch(e){ inp.style.borderColor=COL.coral; }
+        applyBounds();
+      });
+      w.get=()=> cached!=null ? cached : autoDefault;
+      w.set=(v)=>{ if(v==null){ inp.value=''; cached=null; } else { inp.value=String(v); cached=evalConst(String(v)); } inp.style.borderColor=''; };
+      return w;
+    }
+    const xMinC=makeBoundInput('x min',-10);
+    const xMaxC=makeBoundInput('x max',10);
+    const yMinC=makeBoundInput('y min',-10);
+    const yMaxC=makeBoundInput('y max',10);
     const boundsWrap=document.createElement('div'); boundsWrap.className='ctrl';
-    boundsWrap.innerHTML='<label>View window</label>';
+    boundsWrap.innerHTML='<label>View window <span class="hint" style="font-weight:500;">leave blank for auto; accepts pi, e, sqrt(2), sqrt[3](5)…</span></label>';
     const bg=document.createElement('div'); bg.className='bounds-grid'; bg.append(xMinC,xMaxC,yMinC,yMaxC);
     boundsWrap.appendChild(bg);
 
-    const resetBtn=UI.buttons([{label:'Reset view',onclick:()=>{ xMinC.set(-10);xMaxC.set(10);yMinC.set(-10);yMaxC.set(10); applyBounds(); }}]);
+    const aspectC=UI.seg({label:'Aspect ratio',options:[{label:'Equal (circles look round)',value:'equal'},{label:'Stretch to fill',value:'stretch'}],value:'equal',onchange:render});
+    const asymC=UI.seg({label:'Asymptotes (for y=f(x) curves)',options:[{label:'Show',value:'show'},{label:'Hide',value:'hide'}],value:'show',onchange:render});
+
+    const resetBtn=UI.buttons([{label:'Reset view',onclick:()=>{ xMinC.set(null);xMaxC.set(null);yMinC.set(null);yMaxC.set(null); applyBounds(); }}]);
 
     const plot=UI.plotCard('Graph — scroll/pinch or drag to explore',560,'graphing-calculator');
-    host.appendChild(UI.appGrid([eqWrap,boundsWrap,resetBtn,
-      UI.note('Bare expressions like <b>x^2-3</b> are graphed as <b>y =</b> that expression. Use <b>=</b> for implicit curves, e.g. <b>x^2+y^2=9</b> or <b>x^3+y^3=6xy</b>. Supported: + − × / ^, parentheses, <b>sin cos tan</b>, <b>asin acos atan</b>, <b>sinh cosh tanh</b>, <b>exp ln log sqrt abs</b>, and constants <b>pi</b>, <b>e</b>.')
+    host.appendChild(UI.appGrid([eqWrap,boundsWrap,aspectC,asymC,resetBtn,
+      UI.note('Bare expressions like <b>x^2-3</b> are graphed as <b>y =</b> that expression. Use <b>=</b> for implicit curves, e.g. <b>x^2+y^2=9</b> or <b>x^3+y^3=6xy</b>. Supported: + − × / ^, parentheses, <b>sin cos tan</b>, <b>asin acos atan</b>, <b>sinh cosh tanh</b>, <b>exp ln log sqrt abs</b>, constants <b>pi</b> <b>e</b>, and roots like <b>sqrt(2)</b> or <b>sqrt[3](5)</b> for a cube root. The view window starts on auto (−10 to 10) — type a bound to restrict it. Dashed lines mark detected vertical/horizontal asymptotes for y=f(x) curves.')
     ],[plot]));
 
     plot.enableZoom(render);
@@ -1537,7 +1631,16 @@ add({ id:'graphing-calculator', cat:'calc1', tag:'interactive', title:'Graphing 
       let xMin=xMinC.get(), xMax=xMaxC.get(), yMin=yMinC.get(), yMax=yMaxC.get();
       if(!(isFinite(xMin)&&isFinite(xMax)&&xMax>xMin)) xMax=xMin+1;
       if(!(isFinite(yMin)&&isFinite(yMax)&&yMax>yMin)) yMax=yMin+1;
-      const ch=plot.chart(); ch.setX(xMin,xMax).setY(yMin,yMax); ch.clear();
+      const ch=plot.chart(); ch.setX(xMin,xMax).setY(yMin,yMax);
+      // optionally pad one axis so 1 unit in x and 1 unit in y span the same number of
+      // pixels — otherwise a circle (x^2+y^2=r^2) renders as an ellipse.
+      if(aspectC.get()==='equal'){
+        const pxSpan=ch.px1-ch.px0, pySpan=ch.py0-ch.py1;
+        const uppx=(ch.xmax-ch.xmin)/pxSpan, uppy=(ch.ymax-ch.ymin)/pySpan;
+        if(uppx>uppy){ const cy=(ch.ymin+ch.ymax)/2, half=uppx*pySpan/2; ch.ymin=cy-half; ch.ymax=cy+half; }
+        else if(uppy>uppx){ const cx=(ch.xmin+ch.xmax)/2, half=uppy*pxSpan/2; ch.xmin=cx-half; ch.xmax=cx+half; }
+      }
+      ch.clear();
       ch.gridlines(niceTicks(ch.xmin,ch.xmax,8),niceTicks(ch.ymin,ch.ymax,8));
       ch.axes(); ch.axisX(niceTicks(ch.xmin,ch.xmax,8)); ch.axisY(niceTicks(ch.ymin,ch.ymax,8));
       ch.clip();
@@ -1545,13 +1648,23 @@ add({ id:'graphing-calculator', cat:'calc1', tag:'interactive', title:'Graphing 
         const src=eq.input.value;
         if(!src||!src.trim()){ eq.rowEl.classList.remove('eq-error'); return; }
         try{
-          const G=parseImplicitEq(src);
-          const segs=marchingSquaresSegments(G,ch.xmin,ch.xmax,ch.ymin,ch.ymax,260,190);
-          const ctx=ch.ctx; ctx.strokeStyle=eq.color; ctx.lineWidth=2.6; ctx.lineJoin='round'; ctx.beginPath();
-          segs.forEach(s=>{ ctx.moveTo(ch.X(s[0][0]),ch.Y(s[0][1])); ctx.lineTo(ch.X(s[1][0]),ch.Y(s[1][1])); });
-          ctx.stroke();
+          const parsed=classifyEquation(src);
+          if(parsed.type==='explicit'){
+            if(asymC.get()==='show'){
+              const {vert,horiz}=detectAsymptotes(parsed.fn,ch.xmin,ch.xmax);
+              const guide=hexA(eq.color,.5);
+              vert.forEach(xv=>{ if(xv>ch.xmin&&xv<ch.xmax) ch.vline(xv,guide,1.4,[5,4]); });
+              horiz.forEach(yv=>{ if(yv>ch.ymin&&yv<ch.ymax) ch.line(ch.xmin,yv,ch.xmax,yv,guide,1.4,[5,4]); });
+            }
+            ch.curve(parsed.fn,eq.color,2.6,500);
+          } else {
+            const segs=marchingSquaresSegments(parsed.G,ch.xmin,ch.xmax,ch.ymin,ch.ymax,260,190);
+            const ctx=ch.ctx; ctx.strokeStyle=eq.color; ctx.lineWidth=2.6; ctx.lineJoin='round'; ctx.beginPath();
+            segs.forEach(s=>{ ctx.moveTo(ch.X(s[0][0]),ch.Y(s[0][1])); ctx.lineTo(ch.X(s[1][0]),ch.Y(s[1][1])); });
+            ctx.stroke();
+          }
           eq.rowEl.classList.remove('eq-error');
-        }catch(e){ eq.rowEl.classList.add('eq-error'); }
+        }catch(e){ eq.rowEl.classList.add('eq-error'); const w=eq.rowEl.querySelector('.eq-warn'); if(w) w.setAttribute('title',"Couldn't parse: "+e.message); }
       });
       ch.unclip();
     }
