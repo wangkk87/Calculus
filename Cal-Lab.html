@@ -1614,13 +1614,12 @@ add({ id:'graphing-calculator', cat:'calc1', tag:'interactive', title:'Graphing 
     const bg=document.createElement('div'); bg.className='bounds-grid'; bg.append(xMinC,xMaxC,yMinC,yMaxC);
     boundsWrap.appendChild(bg);
 
-    const aspectC=UI.seg({label:'Aspect ratio',options:[{label:'Equal (circles look round)',value:'equal'},{label:'Stretch to fill',value:'stretch'}],value:'equal',onchange:render});
     const asymC=UI.seg({label:'Asymptotes (for y=f(x) curves)',options:[{label:'Show',value:'show'},{label:'Hide',value:'hide'}],value:'show',onchange:render});
 
     const resetBtn=UI.buttons([{label:'Reset view',onclick:()=>{ xMinC.set(null);xMaxC.set(null);yMinC.set(null);yMaxC.set(null); applyBounds(); }}]);
 
     const plot=UI.plotCard('Graph — scroll/pinch or drag to explore',560,'graphing-calculator');
-    host.appendChild(UI.appGrid([eqWrap,boundsWrap,aspectC,asymC,resetBtn,
+    host.appendChild(UI.appGrid([eqWrap,boundsWrap,asymC,resetBtn,
       UI.note('Bare expressions like <b>x^2-3</b> are graphed as <b>y =</b> that expression. Use <b>=</b> for implicit curves, e.g. <b>x^2+y^2=9</b> or <b>x^3+y^3=6xy</b>. Supported: + − × / ^, parentheses, <b>sin cos tan</b>, <b>asin acos atan</b>, <b>sinh cosh tanh</b>, <b>exp ln log sqrt abs</b>, constants <b>pi</b> <b>e</b>, and roots like <b>sqrt(2)</b> or <b>sqrt[3](5)</b> for a cube root. The view window starts on auto (−10 to 10) — type a bound to restrict it. Dashed lines mark detected vertical/horizontal asymptotes for y=f(x) curves.')
     ],[plot]));
 
@@ -1634,7 +1633,7 @@ add({ id:'graphing-calculator', cat:'calc1', tag:'interactive', title:'Graphing 
       const ch=plot.chart(); ch.setX(xMin,xMax).setY(yMin,yMax);
       // optionally pad one axis so 1 unit in x and 1 unit in y span the same number of
       // pixels — otherwise a circle (x^2+y^2=r^2) renders as an ellipse.
-      if(aspectC.get()==='equal'){
+      {
         const pxSpan=ch.px1-ch.px0, pySpan=ch.py0-ch.py1;
         const uppx=(ch.xmax-ch.xmin)/pxSpan, uppy=(ch.ymax-ch.ymin)/pySpan;
         if(uppx>uppy){ const cy=(ch.ymin+ch.ymax)/2, half=uppx*pySpan/2; ch.ymin=cy-half; ch.ymax=cy+half; }
@@ -1652,9 +1651,9 @@ add({ id:'graphing-calculator', cat:'calc1', tag:'interactive', title:'Graphing 
           if(parsed.type==='explicit'){
             if(asymC.get()==='show'){
               const {vert,horiz}=detectAsymptotes(parsed.fn,ch.xmin,ch.xmax);
-              const guide=hexA(eq.color,.5);
-              vert.forEach(xv=>{ if(xv>ch.xmin&&xv<ch.xmax) ch.vline(xv,guide,1.4,[5,4]); });
-              horiz.forEach(yv=>{ if(yv>ch.ymin&&yv<ch.ymax) ch.line(ch.xmin,yv,ch.xmax,yv,guide,1.4,[5,4]); });
+              const guide=COL.faint;
+              vert.forEach(xv=>{ if(xv>ch.xmin&&xv<ch.xmax) ch.vline(xv,guide,1.4,[6,4]); });
+              horiz.forEach(yv=>{ if(yv>ch.ymin&&yv<ch.ymax) ch.line(ch.xmin,yv,ch.xmax,yv,guide,1.4,[6,4]); });
             }
             ch.curve(parsed.fn,eq.color,2.6,500);
           } else {
