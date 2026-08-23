@@ -275,7 +275,7 @@ canvas{display:block;}
       CalculusLab <span class="beta">v1</span>
     </button>
     <nav id="topnav"></nav>
-    <span class="visit-badge" id="visitBadge" title="Times you've visited this page">
+    <span class="visit-badge" id="visitBadge" title="Total visits to this page">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>
       <b id="visitCount">0</b><span class="vlabel">&nbsp;visits</span>
     </span>
@@ -3969,16 +3969,17 @@ function applyDark(d){
 function toggleDark(){ _dark=!_dark; try{localStorage.setItem('cl-dark',_dark?'1':'0');}catch(e){} applyDark(_dark); }
 
 /* -------------------- VISIT COUNTER ---------------------------- */
-function recordVisit(){
-  let n=1;
-  try{
-    n=parseInt(localStorage.getItem('cl-visits')||'0',10)||0;
-    n+=1;
-    localStorage.setItem('cl-visits',String(n));
-  }catch(e){}
+async function recordVisit(){
   const el=document.getElementById('visitCount');
-  if(el) el.textContent=n;
-  return n;
+  try{
+    const res = await fetch('https://cal-lab-counter.wangkk87.workers.dev/');
+    const data = await res.json();
+    if(el) el.textContent = data.count;
+    return data.count;
+  }catch(e){
+    console.error('Visit counter fetch failed:', e);
+    if(el) el.textContent = '—';
+  }
 }
 
 function shareApplet(){
