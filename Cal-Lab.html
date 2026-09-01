@@ -1715,7 +1715,17 @@ add({ id:'limit-explorer', cat:'calc1', tag:'interactive', title:'Limit Explorer
     const concl=UI.statsBox();
     host.appendChild(UI.appGrid([fin,aIn,UI.note('The table shows f(x) as x creeps toward a from each side. If both columns head to the same number, that number is the <b>limit</b> — even when f(a) is undefined (a <b>hollow dot</b>) or sits somewhere else (a removable hole). Drag/scroll the plot to zoom.')],[plot,tbl,concl]));
     plot.enableZoom(render);
-    function sideLimit(f,a,dir){ let v=NaN; for(const o of [1e-1,1e-2,1e-3,1e-4,1e-5,1e-6]){ const y=f(a+dir*o); if(isFinite(y))v=y; } return v; }
+    // walks x toward a from one side; returns a finite limit, or +/-Infinity if the
+    // values keep blowing up (e.g. 1/x^2 at x=0) instead of settling on a number
+    function sideLimit(f,a,dir){
+      const samples=[1e-1,1e-2,1e-3,1e-4,1e-5,1e-6].map(o=>f(a+dir*o)).filter(isFinite);
+      if(!samples.length) return NaN;
+      const last=samples[samples.length-1];
+      const prev=samples.length>1?samples[samples.length-2]:null;
+      // blowing up: the last sample is large AND still growing relative to the previous one
+      if(Math.abs(last)>1e4 && (prev===null || Math.abs(last)>Math.abs(prev)*3)) return last>0?Infinity:-Infinity;
+      return last;
+    }
     function render(){
       const f=fin.fn(); if(!f)return; const a=aIn.get();
       const offs=[1,0.5,0.1,0.01,0.001];
@@ -1727,18 +1737,23 @@ add({ id:'limit-explorer', cat:'calc1', tag:'interactive', title:'Limit Explorer
       }
       tbl.innerHTML=rows;
       const fa=f(a); const Lm=sideLimit(f,a,-1), Lp=sideLimit(f,a,1);
+      const fmtSide=v=>isFinite(v)?M.round(v,5):(v===Infinity?'+∞':v===-Infinity?'−∞':'—');
       const exists=isFinite(Lm)&&isFinite(Lp)&&Math.abs(Lp-Lm)<1e-3; const L=(Lp+Lm)/2;
+      const sameInfinity=(Lm===Infinity&&Lp===Infinity)||(Lm===-Infinity&&Lp===-Infinity);
       const conclData=[
-        {k:'left limit L⁻ (x→a⁻)', v: isFinite(Lm)?M.round(Lm,5):'—'},
-        {k:'right limit L⁺ (x→a⁺)', v: isFinite(Lp)?M.round(Lp,5):'—'},
+        {k:'left limit L⁻ (x→a⁻)', v: fmtSide(Lm)},
+        {k:'right limit L⁺ (x→a⁺)', v: fmtSide(Lp)},
         {k:`f(${M.round(a,3)})`, v: isFinite(fa)?M.round(fa,5):`<span style="color:${COL.coral}">undefined</span>`}
       ];
       if(exists){
         let lv=`<span style="color:${COL.calc1}">${M.round(L,5)}</span>`;
         if(!isFinite(fa)||Math.abs(fa-L)>1e-3) lv+=`<div style="font-size:.68rem;font-weight:500;color:${COL.amber};margin-top:2px;">removable hole — f(a) ≠ limit</div>`;
         conclData.push({k:'limit', v:lv, accent:1});
+      } else if(sameInfinity){
+        conclData.push({k:'limit', v:`<span style="color:${COL.coral}">${Lm>0?'+∞':'−∞'}</span><div style="font-size:.68rem;font-weight:500;color:${COL.soft};margin-top:2px;">diverges — vertical asymptote at x=${M.round(a,3)}</div>`, accent:1});
       } else {
-        conclData.push({k:'limit', v:`<span style="color:${COL.coral}">does not exist</span><div style="font-size:.68rem;font-weight:500;color:${COL.soft};margin-top:2px;">left ≠ right</div>`, accent:1});
+        const detail=(!isFinite(Lm)||!isFinite(Lp))?'unbounded near a':'left ≠ right';
+        conclData.push({k:'limit', v:`<span style="color:${COL.coral}">does not exist</span><div style="font-size:.68rem;font-weight:500;color:${COL.soft};margin-top:2px;">${detail}</div>`, accent:1});
       }
       concl.set(conclData);
       const span=2; const ch=plot.chart(); ch.setX(a-span,a+span);
